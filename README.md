@@ -9,6 +9,44 @@ The current scope is read-only:
 - allocation weights are deterministic library math
 - execution, signing, and deposit simulation are not wired yet
 
+## Pure Infra Boundary
+
+Savings MCP produces portable payloads that an integrating app, agent runtime, wallet, or backend can decide how to use.
+
+This repo owns:
+
+- venue adapters and normalized USDC opportunity data
+- deterministic comparison, scoring, and allocation helpers
+- schema-checked payloads for metrics, analysis, and allocation previews
+- MCP tools and Mastra tools that expose those deterministic helpers
+
+Integrating applications own:
+
+- users, auth, sessions, and wallet provisioning
+- signatures, transaction submission, and custody decisions
+- ledgers, balances, account histories, and UI state
+- fee policy and production routing orchestration
+
+## Mastra Layer
+
+Mastra is wired as a parallel agent/workflow layer over the deterministic savings library.
+
+Folder map:
+
+- `src/mastra/schemas/savings.ts`: zod schemas for opportunities, metric packets, data quality, allocation inputs/outputs, and workflow payloads.
+- `src/mastra/tools/index.ts`: thin Mastra tool wrappers around existing deterministic library functions.
+- `src/mastra/index.ts`: public exports for the Mastra surface.
+
+Current tools:
+
+- `searchUsdcOpportunitiesTool`
+- `compareOpportunitiesTool`
+- `proposeAllocationTool`
+- `getMetricPacketTool`
+- `analyzeDataQualityTool`
+
+The Mastra layer does not add auth, wallet signing, account persistence, transaction sending, or user ledgers.
+
 ## Run
 
 ```bash
