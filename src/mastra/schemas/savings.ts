@@ -5,6 +5,8 @@ export const riskPreferenceSchema = z.enum(['conservative', 'balanced', 'aggress
 export const allocationNudgeSchema = z.enum(['more_conservative', 'more_aggressive', 'fewer_pools']);
 export const productTypeSchema = z.enum(['lending_reserve', 'vault']);
 export const withdrawalModeSchema = z.enum(['instant', 'debt_ceiling', 'buffer', 'epoch', 'lp_exit', 'unknown']);
+export const confidenceSchema = z.enum(['low', 'medium', 'high']);
+export const riskLevelSchema = z.enum(['low', 'medium', 'high']);
 
 export const savingsAssetSchema = z.object({
   symbol: z.literal('USDC'),
@@ -187,20 +189,89 @@ export const dataQualityReportSchema = z.object({
 });
 
 export const rateQualityAnalysisSchema = z.object({
-  summary: z.string(),
   opportunityId: z.string(),
-  baseYield: z.string().optional(),
-  rewardYield: z.string().optional(),
-  stabilityNote: z.string(),
-  confidence: z.enum(['low', 'medium', 'high'])
+  summary: z.string(),
+  apySource: z.string(),
+  apyWindow: z.string(),
+  currentApy: z.number(),
+  baseApy: z.number().nullable(),
+  rewardsApy: z.number().nullable(),
+  missingHistory: z.boolean(),
+  stabilityConfidence: confidenceSchema,
+  warnings: z.array(z.string()),
+  evidence: z.array(opportunityEvidenceSchema)
 });
 
 export const exitLiquidityAnalysisSchema = z.object({
-  summary: z.string(),
   opportunityId: z.string(),
+  summary: z.string(),
   withdrawalMode: withdrawalModeSchema,
+  utilizationPct: z.number().nullable(),
+  withdrawalBufferPct: z.number().nullable(),
+  debtCeilingNote: z.string(),
+  lpExitNote: z.string(),
+  exitRiskLevel: riskLevelSchema,
   risks: z.array(z.string()),
-  confidence: z.enum(['low', 'medium', 'high'])
+  evidence: z.array(opportunityEvidenceSchema)
+});
+
+export const capacityUtilizationAnalysisSchema = z.object({
+  opportunityId: z.string(),
+  summary: z.string(),
+  tvlUsd: z.number(),
+  utilizationPct: z.number().nullable(),
+  depositable: z.boolean(),
+  simulatable: z.boolean(),
+  capacitySignals: z.object({
+    thinVenue: z.boolean(),
+    highUtilization: z.boolean(),
+    cappedOrUnavailable: z.boolean(),
+    fragmentedLiquidity: z.boolean()
+  }),
+  warnings: z.array(z.string()),
+  evidence: z.array(opportunityEvidenceSchema)
+});
+
+export const strategyExposureAnalysisSchema = z.object({
+  opportunityId: z.string(),
+  summary: z.string(),
+  productType: productTypeSchema,
+  usesExternalStrategies: z.boolean(),
+  hasLpExposure: z.boolean(),
+  exposureFlags: z.array(z.enum(['simple_reserve', 'managed_vault', 'external_strategy', 'lp_exposure'])),
+  routingNotes: z.array(z.string()),
+  warnings: z.array(z.string()),
+  evidence: z.array(opportunityEvidenceSchema)
+});
+
+export const venueRiskDecompositionSchema = z.object({
+  opportunityId: z.string(),
+  venue: z.string(),
+  protocol: z.string(),
+  productType: productTypeSchema,
+  comparableRiskTier: riskTierSchema,
+  riskScore: z.number(),
+  summary: z.string(),
+  components: z.object({
+    rateQuality: confidenceSchema,
+    exitLiquidity: riskLevelSchema,
+    capacity: riskLevelSchema,
+    strategyExposure: riskLevelSchema
+  }),
+  warnings: z.array(z.string()),
+  evidence: z.array(opportunityEvidenceSchema)
+});
+
+export const strategyNarrationSchema = z.object({
+  summary: z.string(),
+  allocationUnchanged: z.literal(true),
+  riskEnvelope: z.string(),
+  blendedApyPct: z.number(),
+  blendedRiskScore: z.number(),
+  weights: z.array(allocationWeightSchema),
+  narration: z.string(),
+  nonResponsibilities: z.array(z.string()),
+  evidence: z.array(opportunityEvidenceSchema)
 });
 
 export const allocationWorkflowInputSchema = proposeAllocationInputSchema;
@@ -214,3 +285,10 @@ export const allocationWorkflowOutputSchema = z.object({
 
 export type MetricPacket = z.infer<typeof metricPacketSchema>;
 export type DataQualityReport = z.infer<typeof dataQualityReportSchema>;
+export type AllocationOutput = z.infer<typeof allocationOutputSchema>;
+export type RateQualityAnalysis = z.infer<typeof rateQualityAnalysisSchema>;
+export type ExitLiquidityAnalysis = z.infer<typeof exitLiquidityAnalysisSchema>;
+export type CapacityUtilizationAnalysis = z.infer<typeof capacityUtilizationAnalysisSchema>;
+export type StrategyExposureAnalysis = z.infer<typeof strategyExposureAnalysisSchema>;
+export type VenueRiskDecomposition = z.infer<typeof venueRiskDecompositionSchema>;
+export type StrategyNarration = z.infer<typeof strategyNarrationSchema>;

@@ -35,6 +35,7 @@ Folder map:
 
 - `src/mastra/schemas/savings.ts`: zod schemas for opportunities, metric packets, data quality, allocation inputs/outputs, and workflow payloads.
 - `src/mastra/tools/index.ts`: thin Mastra tool wrappers around existing deterministic library functions.
+- `src/mastra/agents/metric-specialists.ts`: structured-output Mastra metric specialists over normalized payloads.
 - `src/mastra/index.ts`: public exports for the Mastra surface.
 
 Current tools:
@@ -46,6 +47,19 @@ Current tools:
 - `analyzeDataQualityTool`
 
 The Mastra layer does not add auth, wallet signing, account persistence, transaction sending, or user ledgers.
+
+### Metric Specialist Agents
+
+The first specialist agents consume `metricPacketSchema`, allocation outputs, and other normalized Savings MCP payloads only.
+
+- `RateQualityAgent`: APY source/window, base versus rewards, stability confidence, and missing history.
+- `ExitLiquidityAgent`: withdrawal mode, utilization, buffers, debt-ceiling notes, LP exit notes, and exit risk level.
+- `CapacityUtilizationAgent`: TVL, utilization, depositability, caps/unavailability, and thin or fragmented venue warnings.
+- `StrategyExposureAgent`: managed vaults, external strategy routing, Kamino Earn/Meteora notes, and LP exposure flags.
+- `VenueRiskDecomposerAgent`: specialist-output synthesis into comparable venue/product risk.
+- `StrategyNarratorAgent`: narration for fixed deterministic allocations; it never changes weights.
+
+Each agent exports a zod `outputSchema`. Fixture-mode tests use a stable deterministic harness so no live model call is required.
 
 ## Run
 
