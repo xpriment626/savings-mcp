@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:raw": "tsx scripts/test-raw-requests.ts",
+    "test:mastra-workflow": "tsx scripts/test-mastra-workflow.ts",
     "request:catalogue": "tsx scripts/raw-request.ts get_usdc_opportunities"
   },
   "devDependencies": {

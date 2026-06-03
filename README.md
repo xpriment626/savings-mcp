@@ -36,6 +36,8 @@ Folder map:
 - `src/mastra/schemas/savings.ts`: zod schemas for opportunities, metric packets, data quality, allocation inputs/outputs, and workflow payloads.
 - `src/mastra/tools/index.ts`: thin Mastra tool wrappers around existing deterministic library functions.
 - `src/mastra/agents/metric-specialists.ts`: structured-output Mastra metric specialists over normalized payloads.
+- `src/mastra/workflows/analyze-savings-allocation.ts`: `analyzeSavingsAllocationWorkflow` and deterministic app/script runner.
+- `src/mastra/mcp-server.ts`: parallel Mastra `MCPServer` exposing tools and workflow.
 - `src/mastra/index.ts`: public exports for the Mastra surface.
 
 Current tools:
@@ -61,6 +63,31 @@ The first specialist agents consume `metricPacketSchema`, allocation outputs, an
 
 Each agent exports a zod `outputSchema`. Fixture-mode tests use a stable deterministic harness so no live model call is required.
 
+### Allocation Analysis Workflow
+
+`analyzeSavingsAllocationWorkflow` composes the Savings MCP tools and metric specialists into one portable payload for integrating apps.
+
+Input:
+
+- `opportunityIds`
+- `amountUsd`
+- `riskPreference`
+- `nudges?`
+- `refresh?`
+
+Output:
+
+- selected opportunities
+- deterministic data-quality and eligibility reports
+- deterministic allocation
+- metric packets
+- specialist analyses
+- comparable venue risk decomposition
+- fixed-weight strategy narration
+- explicit external-integrator boundaries for auth, signing, transaction sending, and user ledgers
+
+The parallel Mastra MCP surface is available from `createSavingsMastraMcpServer(...)`; it exposes the Mastra tools plus `run_analyzeSavingsAllocationWorkflow`.
+
 ## Run
 
 ```bash
@@ -79,6 +106,7 @@ Run deterministic raw endpoint smoke tests without leaving a server running:
 
 ```bash
 npm run test:raw
+npm run test:mastra-workflow
 ```
 
 Call a running local server:

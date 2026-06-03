@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import { createSavingsMastraMcpServer, createSavingsMastraMcpSurface } from '../src/mastra/mcp-server.js';
+import {
+  analyzeSavingsAllocationOutputSchema,
+  analyzeSavingsAllocationWorkflowInputSchema
+} from '../src/mastra/schemas/savings.js';
+import {
+  analyzeSavingsAllocationWorkflow,
+  createAnalyzeSavingsAllocationWorkflow,
+  runAnalyzeSavingsAllocation
+} from '../src/mastra/workflows/analyze-savings-allocation.js';
+
+const fixtureConfig = {
+  useFixtureCatalogue: true,
+  port: 0
+};
+
+const workflowInput = {
+  opportunityIds: ['kamino:lend:main-usdc', 'kamino:earn:usdc-core'],
+  amountUsd: 10_000,
+  riskPreference: 'balanced' as const
+};
+
+describe('analyzeSavingsAllocationWorkflow', () => {
+  it('returns a portable structured allocation-analysis payload', async () => {
+    const output = analyzeSavingsAllocationOutputSchema.parse(await runAnalyzeSavingsAllocation(workflowInput, fixtureConfig));
+
+    assert.equal(output.kind, 'savings.allocation.analysis');
+    assert.equal(output.version, '0.1.0');
+    assert.equal(output.input.amountUsd, 10_000);
+    assert.deepEqual(output.selectedOpportunityIds, workflowInput.opportunityIds);
+    assert.equal(output.selectedOpportunities.length, 2);
+    assert.equal(output.metricPackets.length, 2);
+    assert.equal(output.opportunityAnalyses.length, 2);
+    assert.equal(output.allocation.allocation.weights.length, 2);
+    assert.equal(output.strategyNarration.allocationUnchanged, true);
+    assert.equal(output.boundaries.auth, 'external_integrator');
+    assert.equal(output.boundaries.signing, 'external_integrator');
+    assert.equal(output.boundaries.userLedger, 'external_integrator');
+    assert.equal(output.opportunityAnalyses.every((analysis) => analysis.evidence.length > 0), true);
+  });
+
+  it('executes through the committed Mastra workflow run API', async () => {
+    analyzeSavingsAllocationWorkflowInputSchema.parse(workflowInput);
+
+    assert.equal(analyzeSavingsAllocationWorkflow.id, 'analyzeSavingsAllocationWorkflow');
+    const workflow = createAnalyzeSavingsAllocationWorkflow(fixtureConfig);
+    const run = await workflow.createRun();
+    const result = await run.start({ inputData: workflowInput });
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.result.kind, 'savings.allocation.analysis');
+    assert.equal(result.result.strategyNarration.allocationUnchanged, true);
+  });
+
+  it('exposes the workflow through the parallel Mastra MCPServer surface', () => {
+    const server = createSavingsMastraMcpServer(fixtureConfig);
+    const surface = createSavingsMastraMcpSurface(fixtureConfig);
+    const tools = server.convertTools(surface.tools, undefined, surface.workflows);
+
+    assert.equal(Boolean(tools.searchUsdcOpportunitiesTool), true);
+    assert.equal(Boolean(tools.proposeAllocationTool), true);
+    assert.equal(Boolean(tools.run_analyzeSavingsAllocationWorkflow), true);
+  });
+});

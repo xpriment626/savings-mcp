@@ -276,6 +276,60 @@ export const strategyNarrationSchema = z.object({
 
 export const allocationWorkflowInputSchema = proposeAllocationInputSchema;
 
+export const eligibilityReportSchema = z.object({
+  status: z.enum(['ok', 'warning', 'blocked']),
+  eligibleOpportunityIds: z.array(z.string()),
+  ineligible: z.array(
+    z.object({
+      opportunityId: z.string(),
+      reasons: z.array(z.string())
+    })
+  ),
+  warnings: z.array(z.string())
+});
+
+export const opportunityAnalysisSchema = z.object({
+  opportunityId: z.string(),
+  metricPacket: metricPacketSchema,
+  rateQuality: rateQualityAnalysisSchema,
+  exitLiquidity: exitLiquidityAnalysisSchema,
+  capacityUtilization: capacityUtilizationAnalysisSchema,
+  strategyExposure: strategyExposureAnalysisSchema,
+  venueRisk: venueRiskDecompositionSchema,
+  evidence: z.array(opportunityEvidenceSchema)
+});
+
+export const workflowBoundarySchema = z.object({
+  auth: z.literal('external_integrator'),
+  signing: z.literal('external_integrator'),
+  transactionSending: z.literal('external_integrator'),
+  userLedger: z.literal('external_integrator')
+});
+
+export const analyzeSavingsAllocationWorkflowInputSchema = proposeAllocationInputSchema;
+
+export const analyzeSavingsAllocationOutputSchema = z.object({
+  kind: z.literal('savings.allocation.analysis'),
+  version: z.literal('0.1.0'),
+  generatedAt: z.string(),
+  input: analyzeSavingsAllocationWorkflowInputSchema,
+  asset: savingsAssetSchema,
+  source: z.object({
+    venue: z.string(),
+    mode: z.enum(['fixture', 'live']),
+    baseUrl: z.string().optional()
+  }),
+  selectedOpportunityIds: z.array(z.string()),
+  selectedOpportunities: z.array(savingsOpportunitySchema),
+  eligibility: eligibilityReportSchema,
+  dataQuality: dataQualityReportSchema,
+  allocation: allocationOutputSchema,
+  metricPackets: z.array(metricPacketSchema),
+  opportunityAnalyses: z.array(opportunityAnalysisSchema),
+  strategyNarration: strategyNarrationSchema,
+  boundaries: workflowBoundarySchema
+});
+
 export const allocationWorkflowOutputSchema = z.object({
   catalogue: savingsCatalogueSchema,
   allocation: allocationOutputSchema,
@@ -292,3 +346,7 @@ export type CapacityUtilizationAnalysis = z.infer<typeof capacityUtilizationAnal
 export type StrategyExposureAnalysis = z.infer<typeof strategyExposureAnalysisSchema>;
 export type VenueRiskDecomposition = z.infer<typeof venueRiskDecompositionSchema>;
 export type StrategyNarration = z.infer<typeof strategyNarrationSchema>;
+export type AnalyzeSavingsAllocationInput = z.infer<typeof analyzeSavingsAllocationWorkflowInputSchema>;
+export type EligibilityReport = z.infer<typeof eligibilityReportSchema>;
+export type OpportunityAnalysis = z.infer<typeof opportunityAnalysisSchema>;
+export type AnalyzeSavingsAllocationOutput = z.infer<typeof analyzeSavingsAllocationOutputSchema>;
