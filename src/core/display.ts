@@ -44,9 +44,9 @@ export function buildOpportunityDisplay(opportunity: OpportunityWithoutDisplay):
     status: opportunityStatus(opportunity),
     primaryWarnings: opportunityWarnings(opportunity),
     availableFollowups: [
+      'get_usdc_opportunities',
       'compare_opportunities',
-      'propose_allocation',
-      'inspect_risk_breakdown'
+      'propose_allocation'
     ]
   };
 }
@@ -78,9 +78,9 @@ export function buildAllocationDisplay(input: {
     status: 'preview_only',
     primaryWarnings: allocationWarnings(),
     availableFollowups: [
-      'inspect_risk_breakdown',
+      'get_usdc_opportunities',
       'compare_opportunities',
-      'refresh_opportunities'
+      'propose_allocation'
     ]
   };
 }

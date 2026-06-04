@@ -6,6 +6,7 @@ import type { SavingsMcpServer } from '../src/types.js';
 
 let server: SavingsMcpServer | undefined;
 let baseUrl: string | undefined;
+let exposedToolNames = new Set<string>();
 
 function requireBaseUrl(): string {
   if (typeof baseUrl !== 'string') throw new Error('server base URL is not available');
@@ -69,6 +70,7 @@ describe('Savings MCP raw HTTP endpoint', () => {
     assert.deepEqual(body.error, undefined);
     assert.equal(result.tools?.some((tool) => tool.name === 'get_usdc_opportunities'), true);
     assert.equal(result.tools?.some((tool) => tool.name === 'propose_allocation'), true);
+    exposedToolNames = new Set((result.tools ?? []).map((tool) => String(tool.name)));
 
     for (const tool of result.tools ?? []) {
       assert.equal(typeof tool.description, 'string');
@@ -114,6 +116,10 @@ describe('Savings MCP raw HTTP endpoint', () => {
     assert.equal(payload.opportunities?.every((opp) => Number.isFinite(opp.display?.headlineApyPct)), true);
     assert.equal(payload.opportunities?.every((opp) => typeof opp.display?.riskBadge === 'string'), true);
     assert.equal(payload.opportunities?.every((opp) => Array.isArray(opp.display?.availableFollowups)), true);
+    assert.equal(
+      payload.opportunities?.every((opp) => opp.display?.availableFollowups?.every((toolName) => exposedToolNames.has(toolName))),
+      true
+    );
     assert.equal((payload.opportunities?.length ?? 0) >= 2, true);
   });
 
@@ -174,6 +180,6 @@ describe('Savings MCP raw HTTP endpoint', () => {
     assert.equal(payload.display?.displayTitle, '$10,000 USDC allocation preview');
     assert.equal(payload.display?.status, 'preview_only');
     assert.equal(typeof payload.display?.riskBadge, 'string');
-    assert.equal(payload.display?.availableFollowups?.includes('inspect_risk_breakdown'), true);
+    assert.equal(payload.display?.availableFollowups?.every((toolName) => exposedToolNames.has(toolName)), true);
   });
 });
