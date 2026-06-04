@@ -34,9 +34,12 @@ Mastra is wired as a parallel agent/workflow layer over the deterministic saving
 Folder map:
 
 - `src/core/schemas.ts`: canonical zod schemas for opportunities, metric packets, data quality, allocation inputs/outputs, and workflow payloads.
+- `src/core/display.ts`: deterministic display summaries for chat agents and lightweight app renderers.
 - `src/core/metrics.ts`: deterministic metric packet, data-quality, and eligibility helpers.
 - `src/core/analysis.ts`: deterministic specialist analysis and narration helpers.
 - `src/core/tool-args.ts`: shared zod-backed argument parsing for raw MCP and Mastra tools.
+- `src/venues/types.ts`: venue adapter contract for normalized USDC savings venues.
+- `src/venues/kamino.ts`: Kamino adapter implementation for fixture/live USDC catalogue data.
 - `src/mastra/tools/index.ts`: thin Mastra tool wrappers around deterministic library functions.
 - `src/mastra/agents/metric-specialists.ts`: structured-output Mastra metric specialist definitions over normalized payloads.
 - `src/mastra/schemas/savings.ts`: compatibility re-export for the canonical core schemas.
@@ -121,6 +124,40 @@ For fixture-mode local calls:
 ```bash
 SAVINGS_USE_FIXTURE_CATALOGUE=1 npm run dev
 ```
+
+## ChatGPT/Codex Dev-Mode MCP Smoke
+
+Use this after `npm run typecheck`, `npm test`, and `npm run test:raw` pass locally.
+
+Start the server with fixture data:
+
+```bash
+SAVINGS_USE_FIXTURE_CATALOGUE=1 npm run dev
+```
+
+Connect your ChatGPT/Codex dev-mode MCP client to:
+
+```text
+http://127.0.0.1:8788/mcp
+```
+
+The raw MCP tools are read-only and return short `content` status text plus typed `structuredContent`. They do not authenticate users, provision wallets, sign, send transactions, custody funds, execute deposits/redemptions/rebalances, or maintain per-user ledgers.
+
+Manual prompts for the first smoke session:
+
+- “What USDC savings opportunities are available?”
+- “Compare the Kamino lend and earn options.”
+- “Allocate $5,000 conservatively across the available options.”
+- “What risks or blocked states should I know about?”
+- “Which fields should an integrating app store?”
+
+Expected behavior:
+
+- The chat agent discovers `get_usdc_opportunities`, `compare_opportunities`, and `propose_allocation`.
+- The agent reasons from `structuredContent`, not by parsing JSON text from `content`.
+- Opportunity responses include stable IDs, source/provenance, APY, TVL, liquidity, risk, flags, evidence, and `display` summaries.
+- Allocation responses are explicitly preview-only and keep auth/signing/transaction/ledger responsibilities outside Savings MCP.
+- Any warnings about depositability, simulation, managed vault exposure, or high utilization stay visible to the model.
 
 ## Env Pass From Fabrick
 

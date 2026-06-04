@@ -1,4 +1,5 @@
 import { USDC_ASSET } from './constants.js';
+import { attachOpportunityDisplay } from './core/display.js';
 import type { SavingsCatalogue } from './types.js';
 
 export function fixtureCatalogue(generatedAt = new Date().toISOString()): SavingsCatalogue {
@@ -10,7 +11,7 @@ export function fixtureCatalogue(generatedAt = new Date().toISOString()): Saving
       mode: 'fixture'
     },
     opportunities: [
-      {
+      attachOpportunityDisplay({
         id: 'kamino:lend:main-usdc',
         venue: 'Kamino',
         protocol: 'kamino',
@@ -41,8 +42,8 @@ export function fixtureCatalogue(generatedAt = new Date().toISOString()): Saving
           }
         ],
         generated_at: generatedAt
-      },
-      {
+      }),
+      attachOpportunityDisplay({
         id: 'kamino:earn:usdc-core',
         venue: 'Kamino',
         protocol: 'kamino',
@@ -72,8 +73,8 @@ export function fixtureCatalogue(generatedAt = new Date().toISOString()): Saving
           }
         ],
         generated_at: generatedAt
-      },
-      {
+      }),
+      attachOpportunityDisplay({
         id: 'kamino:lend:alt-usdc',
         venue: 'Kamino',
         protocol: 'kamino',
@@ -104,7 +105,7 @@ export function fixtureCatalogue(generatedAt = new Date().toISOString()): Saving
           }
         ],
         generated_at: generatedAt
-      }
+      })
     ]
   };
 }

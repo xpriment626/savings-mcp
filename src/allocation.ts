@@ -1,5 +1,6 @@
 import { RISK_ORDINAL, isAllocationNudge, isRiskPreference } from './constants.js';
 import { getUsdcCatalogue } from './catalogue.js';
+import { buildAllocationDisplay, compareEntryFromOpportunity } from './core/display.js';
 import type {
   AllocationNudge,
   AllocationWeight,
@@ -87,18 +88,7 @@ export async function compareOpportunities(config: AppConfig, args: CompareOppor
     asset: catalogue.asset,
     generated_at: catalogue.generated_at,
     comparison: opportunities
-      .map((opp) => ({
-        id: opp.id,
-        title: opp.title,
-        venue: opp.venue,
-        product_type: opp.product_type,
-        apy: opp.apy,
-        tvl: opp.tvl,
-        liquidity: opp.liquidity,
-        risk: opp.risk,
-        flags: opp.flags,
-        evidence: opp.evidence
-      }))
+      .map(compareEntryFromOpportunity)
       .sort((a, b) => a.risk.score - b.risk.score || b.apy.current - a.apy.current)
   };
 }
@@ -138,6 +128,11 @@ export async function proposeAllocation(config: AppConfig, args: ProposeAllocati
       rationale:
         'Allocation is deterministic library math over selected USDC opportunities; agent narration or future Coral coordination should explain the result, not choose weights randomly.'
     },
+    display: buildAllocationDisplay({
+      amountUsd,
+      blendedApyPct: blendedApyPct(weights),
+      riskEnvelope: riskEnvelope(riskScore)
+    }),
     generated_at: catalogue.generated_at
   };
 }

@@ -20,6 +20,16 @@ export const opportunityEvidenceSchema = z.object({
   observedAt: z.string()
 });
 
+export const opportunityDisplaySchema = z.object({
+  displayTitle: z.string(),
+  headlineApyPct: z.number(),
+  riskBadge: z.string(),
+  liquidityBadge: z.string(),
+  status: z.enum(['depositable', 'not_depositable', 'not_simulatable', 'needs_review']),
+  primaryWarnings: z.array(z.string()),
+  availableFollowups: z.array(z.string())
+});
+
 export const savingsOpportunitySchema = z.object({
   id: z.string(),
   venue: z.string(),
@@ -54,6 +64,7 @@ export const savingsOpportunitySchema = z.object({
     assetMint: z.string().optional()
   }),
   evidence: z.array(opportunityEvidenceSchema),
+  display: opportunityDisplaySchema,
   generated_at: z.string()
 });
 
@@ -113,7 +124,35 @@ export const allocationOutputSchema = z.object({
     rebalanceStrategy: z.string(),
     rationale: z.string()
   }),
+  display: z.object({
+    displayTitle: z.string(),
+    headlineApyPct: z.number(),
+    riskBadge: z.string(),
+    status: z.literal('preview_only'),
+    primaryWarnings: z.array(z.string()),
+    availableFollowups: z.array(z.string())
+  }),
   generated_at: z.string()
+});
+
+export const compareOpportunitySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  venue: z.string(),
+  product_type: productTypeSchema,
+  apy: savingsOpportunitySchema.shape.apy,
+  tvl: savingsOpportunitySchema.shape.tvl,
+  liquidity: savingsOpportunitySchema.shape.liquidity,
+  risk: savingsOpportunitySchema.shape.risk,
+  flags: savingsOpportunitySchema.shape.flags,
+  evidence: z.array(opportunityEvidenceSchema),
+  display: opportunityDisplaySchema
+});
+
+export const compareOpportunitiesOutputSchema = z.object({
+  asset: savingsAssetSchema,
+  generated_at: z.string(),
+  comparison: z.array(compareOpportunitySchema)
 });
 
 export const metricPacketInputSchema = z.object({
@@ -340,6 +379,7 @@ export const allocationWorkflowOutputSchema = z.object({
 export type MetricPacket = z.infer<typeof metricPacketSchema>;
 export type DataQualityReport = z.infer<typeof dataQualityReportSchema>;
 export type AllocationOutput = z.infer<typeof allocationOutputSchema>;
+export type CompareOpportunitiesOutput = z.infer<typeof compareOpportunitiesOutputSchema>;
 export type RateQualityAnalysis = z.infer<typeof rateQualityAnalysisSchema>;
 export type ExitLiquidityAnalysis = z.infer<typeof exitLiquidityAnalysisSchema>;
 export type CapacityUtilizationAnalysis = z.infer<typeof capacityUtilizationAnalysisSchema>;

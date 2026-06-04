@@ -1,5 +1,12 @@
+import { z } from 'zod';
+
 import { compareOpportunities, proposeAllocation } from './allocation.js';
 import { getFilteredOpportunities, getUsdcCatalogue } from './catalogue.js';
+import {
+  allocationOutputSchema,
+  compareOpportunitiesOutputSchema,
+  savingsCatalogueSchema
+} from './core/schemas.js';
 import {
   parseCompareOpportunitiesArgs,
   parseFilterOpportunitiesArgs,
@@ -11,10 +18,26 @@ import type {
   JsonRpcResponse
 } from './types.js';
 
+const PURE_INFRA_BOUNDARY =
+  'Does not authenticate users, sign, send transactions, custody funds, or maintain ledgers.';
+
+const READ_ONLY_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  openWorldHint: false,
+  idempotentHint: true
+} as const;
+
+function jsonSchemaFor(schema: z.ZodType) {
+  return z.toJSONSchema(schema);
+}
+
 const TOOLS = [
   {
     name: 'get_usdc_opportunities',
-    description: 'Return normalized canonical Solana USDC savings opportunities, starting with Kamino.',
+    title: 'Get USDC opportunities',
+    description:
+      `Use when the user asks what canonical Solana USDC savings opportunities are available. Returns typed opportunity data, display summaries, provenance, risk, liquidity, and availability flags. ${PURE_INFRA_BOUNDARY}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -26,22 +49,30 @@ const TOOLS = [
           items: { enum: ['lending_reserve', 'vault'] }
         }
       }
-    }
+    },
+    outputSchema: jsonSchemaFor(savingsCatalogueSchema),
+    annotations: READ_ONLY_ANNOTATIONS
   },
   {
     name: 'compare_opportunities',
-    description: 'Compare USDC opportunities while preserving APY, liquidity, venue risk, and evidence fields.',
+    title: 'Compare USDC opportunities',
+    description:
+      `Use when the user wants to compare selected USDC opportunities by APY, liquidity, risk, availability, and evidence. Returns sorted typed comparison rows with display summaries. ${PURE_INFRA_BOUNDARY}`,
     inputSchema: {
       type: 'object',
       properties: {
         opportunityIds: { type: 'array', items: { type: 'string' } },
         refresh: { type: 'boolean' }
       }
-    }
+    },
+    outputSchema: jsonSchemaFor(compareOpportunitiesOutputSchema),
+    annotations: READ_ONLY_ANNOTATIONS
   },
   {
     name: 'propose_allocation',
-    description: 'Create a deterministic preview allocation across selected USDC opportunities.',
+    title: 'Propose allocation',
+    description:
+      `Use when the user asks for a deterministic USDC allocation preview across selected opportunities. Returns typed weights, display summaries, rationale, and preview-only warnings. ${PURE_INFRA_BOUNDARY}`,
     inputSchema: {
       type: 'object',
       required: ['opportunityIds', 'amountUsd'],
@@ -55,7 +86,9 @@ const TOOLS = [
         },
         refresh: { type: 'boolean' }
       }
-    }
+    },
+    outputSchema: jsonSchemaFor(allocationOutputSchema),
+    annotations: READ_ONLY_ANNOTATIONS
   }
 ] as const;
 
@@ -80,12 +113,13 @@ const RESOURCES = [
   }
 ] as const;
 
-function jsonText(payload: unknown) {
+function toolResult(payload: unknown, statusText: string) {
   return {
+    structuredContent: payload,
     content: [
       {
         type: 'text',
-        text: JSON.stringify(payload, null, 2)
+        text: statusText
       }
     ]
   };
@@ -105,7 +139,8 @@ function riskModelResource() {
       'custody/signing/permission surface'
     ],
     tiers: ['conservative', 'moderate', 'elevated', 'high'],
-    execution_rule: 'Agents reason. Library code allocates, validates, simulates, and prepares transactions.'
+    execution_rule:
+      'Agents reason. Deterministic library code allocates and validates previews; auth, signing, transaction construction, transaction sending, and ledgers are external integrator responsibilities.'
   };
 }
 
@@ -171,12 +206,23 @@ export async function handleMcpRequest(config: AppConfig, request: JsonRpcReques
       const name = params.name;
       const args = params.arguments ?? {};
       let payload: unknown;
-      if (name === 'get_usdc_opportunities') payload = await getFilteredOpportunities(config, parseFilterOpportunitiesArgs(args));
-      else if (name === 'compare_opportunities') payload = await compareOpportunities(config, parseCompareOpportunitiesArgs(args));
-      else if (name === 'propose_allocation') payload = await proposeAllocation(config, parseProposeAllocationArgs(args));
-      else throw new Error(`unknown tool ${String(name)}`);
+      let statusText: string;
+      if (name === 'get_usdc_opportunities') {
+        payload = await getFilteredOpportunities(config, parseFilterOpportunitiesArgs(args));
+        const count = savingsCatalogueSchema.parse(payload).opportunities.length;
+        statusText = `${count} USDC savings opportunities loaded.`;
+      } else if (name === 'compare_opportunities') {
+        payload = await compareOpportunities(config, parseCompareOpportunitiesArgs(args));
+        const count = compareOpportunitiesOutputSchema.parse(payload).comparison.length;
+        statusText = `${count} USDC opportunities compared.`;
+      } else if (name === 'propose_allocation') {
+        payload = await proposeAllocation(config, parseProposeAllocationArgs(args));
+        statusText = 'Deterministic USDC allocation preview loaded.';
+      } else {
+        throw new Error(`unknown tool ${String(name)}`);
+      }
 
-      return { jsonrpc: '2.0', id, result: jsonText(payload) };
+      return { jsonrpc: '2.0', id, result: toolResult(payload, statusText) };
     }
 
     return {
