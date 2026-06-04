@@ -34,12 +34,37 @@ describe('analyzeSavingsAllocationWorkflow', () => {
     assert.equal(output.selectedOpportunities.length, 2);
     assert.equal(output.metricPackets.length, 2);
     assert.equal(output.opportunityAnalyses.length, 2);
+    assert.ok(output.allocation);
+    assert.ok(output.strategyNarration);
     assert.equal(output.allocation.allocation.weights.length, 2);
     assert.equal(output.strategyNarration.allocationUnchanged, true);
     assert.equal(output.boundaries.auth, 'external_integrator');
     assert.equal(output.boundaries.signing, 'external_integrator');
     assert.equal(output.boundaries.userLedger, 'external_integrator');
     assert.equal(output.opportunityAnalyses.every((analysis) => analysis.evidence.length > 0), true);
+  });
+
+  it('returns a structured blocked payload when requested opportunities are unavailable', async () => {
+    const input = {
+      opportunityIds: ['missing-a', 'missing-b'],
+      amountUsd: 10_000,
+      riskPreference: 'balanced' as const
+    };
+
+    const output = analyzeSavingsAllocationOutputSchema.parse(await runAnalyzeSavingsAllocation(input, fixtureConfig));
+
+    assert.equal(output.kind, 'savings.allocation.analysis');
+    assert.equal(output.eligibility.status, 'blocked');
+    assert.deepEqual(
+      output.eligibility.ineligible.map((entry) => entry.opportunityId),
+      ['missing-a', 'missing-b']
+    );
+    assert.deepEqual(output.selectedOpportunityIds, []);
+    assert.equal(output.allocation, null);
+    assert.deepEqual(output.metricPackets, []);
+    assert.deepEqual(output.opportunityAnalyses, []);
+    assert.equal(output.strategyNarration, null);
+    assert.equal(output.boundaries.transactionSending, 'external_integrator');
   });
 
   it('executes through the committed Mastra workflow run API', async () => {
@@ -52,6 +77,7 @@ describe('analyzeSavingsAllocationWorkflow', () => {
 
     assert.equal(result.status, 'success');
     assert.equal(result.result.kind, 'savings.allocation.analysis');
+    assert.ok(result.result.strategyNarration);
     assert.equal(result.result.strategyNarration.allocationUnchanged, true);
   });
 

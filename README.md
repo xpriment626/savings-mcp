@@ -33,9 +33,13 @@ Mastra is wired as a parallel agent/workflow layer over the deterministic saving
 
 Folder map:
 
-- `src/mastra/schemas/savings.ts`: zod schemas for opportunities, metric packets, data quality, allocation inputs/outputs, and workflow payloads.
-- `src/mastra/tools/index.ts`: thin Mastra tool wrappers around existing deterministic library functions.
-- `src/mastra/agents/metric-specialists.ts`: structured-output Mastra metric specialists over normalized payloads.
+- `src/core/schemas.ts`: canonical zod schemas for opportunities, metric packets, data quality, allocation inputs/outputs, and workflow payloads.
+- `src/core/metrics.ts`: deterministic metric packet, data-quality, and eligibility helpers.
+- `src/core/analysis.ts`: deterministic specialist analysis and narration helpers.
+- `src/core/tool-args.ts`: shared zod-backed argument parsing for raw MCP and Mastra tools.
+- `src/mastra/tools/index.ts`: thin Mastra tool wrappers around deterministic library functions.
+- `src/mastra/agents/metric-specialists.ts`: structured-output Mastra metric specialist definitions over normalized payloads.
+- `src/mastra/schemas/savings.ts`: compatibility re-export for the canonical core schemas.
 - `src/mastra/workflows/analyze-savings-allocation.ts`: `analyzeSavingsAllocationWorkflow` and deterministic app/script runner.
 - `src/mastra/mcp-server.ts`: parallel Mastra `MCPServer` exposing tools and workflow.
 - `src/mastra/index.ts`: public exports for the Mastra surface.
@@ -100,21 +104,17 @@ Endpoint:
 http://127.0.0.1:8788/mcp
 ```
 
-## Raw Request Scripts
+## Contributor Tests
 
-Run deterministic raw endpoint smoke tests without leaving a server running:
+Run deterministic raw endpoint and Mastra workflow tests without leaving a server running:
 
 ```bash
+npm test
 npm run test:raw
 npm run test:mastra-workflow
 ```
 
-Call a running local server:
-
-```bash
-npm run request:catalogue
-tsx scripts/raw-request.ts propose_allocation '{"opportunityIds":["kamino:lend:main-usdc","kamino:earn:usdc-core"],"amountUsd":10000,"riskPreference":"balanced"}'
-```
+Internal one-off request scripts can live under ignored `scripts/`, but committed `package.json` commands only point at tracked contributor-runnable tests.
 
 For fixture-mode local calls:
 

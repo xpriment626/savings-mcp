@@ -1,15 +1,14 @@
 import { compareOpportunities, proposeAllocation } from './allocation.js';
 import { getFilteredOpportunities, getUsdcCatalogue } from './catalogue.js';
+import {
+  parseCompareOpportunitiesArgs,
+  parseFilterOpportunitiesArgs,
+  parseProposeAllocationArgs
+} from './core/tool-args.js';
 import type {
   AppConfig,
-  AllocationNudge,
-  CompareOpportunitiesArgs,
-  FilterOpportunitiesArgs,
   JsonRpcRequest,
-  JsonRpcResponse,
-  ProductType,
-  ProposeAllocationArgs,
-  RiskPreference
+  JsonRpcResponse
 } from './types.js';
 
 const TOOLS = [
@@ -80,70 +79,6 @@ const RESOURCES = [
     mimeType: 'application/json'
   }
 ] as const;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function stringArray(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value.filter((item): item is string => typeof item === 'string');
-}
-
-function productTypes(value: unknown): ProductType[] | undefined {
-  const valid = new Set<ProductType>(['lending_reserve', 'vault']);
-  const items = stringArray(value)?.filter((item): item is ProductType => valid.has(item as ProductType));
-  return items && items.length > 0 ? items : undefined;
-}
-
-function allocationNudges(value: unknown): AllocationNudge[] | undefined {
-  const valid = new Set<AllocationNudge>(['more_conservative', 'more_aggressive', 'fewer_pools']);
-  const items = stringArray(value)?.filter((item): item is AllocationNudge => valid.has(item as AllocationNudge));
-  return items && items.length > 0 ? items : undefined;
-}
-
-function riskPreference(value: unknown): RiskPreference | undefined {
-  if (value === 'conservative' || value === 'balanced' || value === 'aggressive') return value;
-  return undefined;
-}
-
-function numberValue(value: unknown): number | undefined {
-  return Number.isFinite(Number(value)) ? Number(value) : undefined;
-}
-
-function filterArgs(value: unknown): FilterOpportunitiesArgs {
-  if (!isRecord(value)) return {};
-  const args: FilterOpportunitiesArgs = { refresh: Boolean(value.refresh) };
-  const limit = numberValue(value.limit);
-  const minTvlUsd = numberValue(value.minTvlUsd);
-  const types = productTypes(value.productTypes);
-  if (limit !== undefined) args.limit = limit;
-  if (minTvlUsd !== undefined) args.minTvlUsd = minTvlUsd;
-  if (types !== undefined) args.productTypes = types;
-  return args;
-}
-
-function compareArgs(value: unknown): CompareOpportunitiesArgs {
-  if (!isRecord(value)) return {};
-  const args: CompareOpportunitiesArgs = { refresh: Boolean(value.refresh) };
-  const opportunityIds = stringArray(value.opportunityIds);
-  if (opportunityIds !== undefined) args.opportunityIds = opportunityIds;
-  return args;
-}
-
-function proposeArgs(value: unknown): ProposeAllocationArgs {
-  if (!isRecord(value)) return {};
-  const args: ProposeAllocationArgs = { refresh: Boolean(value.refresh) };
-  const opportunityIds = stringArray(value.opportunityIds);
-  const amountUsd = numberValue(value.amountUsd);
-  const preference = riskPreference(value.riskPreference);
-  const nudges = allocationNudges(value.nudges);
-  if (opportunityIds !== undefined) args.opportunityIds = opportunityIds;
-  if (amountUsd !== undefined) args.amountUsd = amountUsd;
-  if (preference !== undefined) args.riskPreference = preference;
-  if (nudges !== undefined) args.nudges = nudges;
-  return args;
-}
 
 function jsonText(payload: unknown) {
   return {
@@ -236,9 +171,9 @@ export async function handleMcpRequest(config: AppConfig, request: JsonRpcReques
       const name = params.name;
       const args = params.arguments ?? {};
       let payload: unknown;
-      if (name === 'get_usdc_opportunities') payload = await getFilteredOpportunities(config, filterArgs(args));
-      else if (name === 'compare_opportunities') payload = await compareOpportunities(config, compareArgs(args));
-      else if (name === 'propose_allocation') payload = await proposeAllocation(config, proposeArgs(args));
+      if (name === 'get_usdc_opportunities') payload = await getFilteredOpportunities(config, parseFilterOpportunitiesArgs(args));
+      else if (name === 'compare_opportunities') payload = await compareOpportunities(config, parseCompareOpportunitiesArgs(args));
+      else if (name === 'propose_allocation') payload = await proposeAllocation(config, parseProposeAllocationArgs(args));
       else throw new Error(`unknown tool ${String(name)}`);
 
       return { jsonrpc: '2.0', id, result: jsonText(payload) };

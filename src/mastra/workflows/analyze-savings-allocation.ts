@@ -1,15 +1,9 @@
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 
+import { buildOpportunityAnalysis, narrateDeterministicAllocation, uniqueOpportunityAnalysisEvidence } from '../../core/analysis.js';
+import { buildEligibilityReport, buildMetricPacket, orderedSelectedOpportunities } from '../../core/metrics.js';
 import { loadConfig } from '../../config.js';
-import type { AppConfig, SavingsCatalogue, SavingsOpportunity } from '../../types.js';
-import {
-  analyzeCapacityUtilization,
-  analyzeExitLiquidity,
-  analyzeRateQuality,
-  analyzeStrategyExposure,
-  decomposeVenueRisk,
-  narrateDeterministicAllocation
-} from '../agents/metric-specialists.js';
+import type { AppConfig } from '../../types.js';
 import {
   allocationOutputSchema,
   analyzeSavingsAllocationOutputSchema,
@@ -24,90 +18,34 @@ import type {
   AllocationOutput,
   DataQualityReport,
   EligibilityReport,
-  MetricPacket,
-  OpportunityAnalysis
+  MetricPacket
 } from '../schemas/savings.js';
-import { buildDataQualityReport, createSavingsMastraTools } from '../tools/index.js';
+import { createSavingsMastraTools } from '../tools/index.js';
 
 function bindConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return { ...loadConfig(), ...overrides };
 }
 
-function eligibilityReasons(opportunity: SavingsOpportunity): string[] {
-  const reasons: string[] = [];
-  if (!opportunity.flags.depositable) reasons.push('opportunity is not currently depositable');
-  if (!opportunity.flags.simulatable) reasons.push('opportunity is not currently simulatable');
-  if (opportunity.evidence.length === 0) reasons.push('opportunity has no evidence links');
-  if (!Number.isFinite(opportunity.apy.current)) reasons.push('opportunity APY is not finite');
-  return reasons;
-}
+const externalIntegratorBoundaries = {
+  auth: 'external_integrator',
+  signing: 'external_integrator',
+  transactionSending: 'external_integrator',
+  userLedger: 'external_integrator'
+} as const;
 
-function buildEligibilityReport(opportunities: readonly SavingsOpportunity[], requestedIds: readonly string[]): EligibilityReport {
-  const availableIds = new Set(opportunities.map((opportunity) => opportunity.id));
-  const ineligible = opportunities
-    .map((opportunity) => ({ opportunityId: opportunity.id, reasons: eligibilityReasons(opportunity) }))
-    .filter((entry) => entry.reasons.length > 0);
-  const missing = requestedIds.filter((id) => !availableIds.has(id));
-
-  for (const opportunityId of missing) {
-    ineligible.push({ opportunityId, reasons: ['requested opportunity was not found in the catalogue'] });
-  }
-
-  const warnings = ineligible.flatMap((entry) => entry.reasons.map((reason) => `${entry.opportunityId}: ${reason}`));
-  const eligibleOpportunityIds = opportunities
-    .filter((opportunity) => eligibilityReasons(opportunity).length === 0)
-    .map((opportunity) => opportunity.id);
+function blockIfAllocationCannotRun(
+  eligibility: EligibilityReport,
+  selectedOpportunityCount: number
+): EligibilityReport {
+  if (selectedOpportunityCount >= 2) return eligibility;
 
   return {
-    status: missing.length > 0 ? 'blocked' : ineligible.length > 0 ? 'warning' : 'ok',
-    eligibleOpportunityIds,
-    ineligible,
-    warnings
-  };
-}
-
-function orderedSelectedOpportunities(
-  opportunities: readonly SavingsOpportunity[],
-  requestedIds: readonly string[]
-): SavingsOpportunity[] {
-  const byId = new Map(opportunities.map((opportunity) => [opportunity.id, opportunity]));
-  return requestedIds.map((id) => byId.get(id)).filter((opportunity): opportunity is SavingsOpportunity => Boolean(opportunity));
-}
-
-function uniqueEvidence(analyses: readonly OpportunityAnalysis[]) {
-  const seen = new Set<string>();
-  return analyses.flatMap((analysis) =>
-    analysis.evidence.filter((evidence) => {
-      const key = `${evidence.label}:${evidence.url}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-  );
-}
-
-function buildOpportunityAnalysis(metricPacket: MetricPacket): OpportunityAnalysis {
-  const rateQuality = analyzeRateQuality(metricPacket);
-  const exitLiquidity = analyzeExitLiquidity(metricPacket);
-  const capacityUtilization = analyzeCapacityUtilization(metricPacket);
-  const strategyExposure = analyzeStrategyExposure(metricPacket);
-  const venueRisk = decomposeVenueRisk({
-    metricPacket,
-    rateQuality,
-    exitLiquidity,
-    capacityUtilization,
-    strategyExposure
-  });
-
-  return {
-    opportunityId: metricPacket.opportunityId,
-    metricPacket,
-    rateQuality,
-    exitLiquidity,
-    capacityUtilization,
-    strategyExposure,
-    venueRisk,
-    evidence: venueRisk.evidence
+    ...eligibility,
+    status: 'blocked',
+    warnings: [
+      ...eligibility.warnings,
+      'at least 2 selected opportunities are required for deterministic allocation'
+    ]
   };
 }
 
@@ -123,14 +61,8 @@ export async function runAnalyzeSavingsAllocation(
   const rawCatalogue = await tools.searchUsdcOpportunitiesTool.execute?.({ refresh: parsedInput.refresh }, toolContext);
   if (!rawCatalogue) throw new Error('searchUsdcOpportunitiesTool did not return a catalogue');
   const catalogue = savingsCatalogueSchema.parse(rawCatalogue);
-  const domainCatalogue = catalogue as unknown as SavingsCatalogue;
 
-  const selectedOpportunities = orderedSelectedOpportunities(domainCatalogue.opportunities, parsedInput.opportunityIds);
-  if (selectedOpportunities.length !== parsedInput.opportunityIds.length) {
-    const dataQuality = buildDataQualityReport(domainCatalogue, parsedInput.opportunityIds);
-    const eligibility = buildEligibilityReport(selectedOpportunities, parsedInput.opportunityIds);
-    throw new Error(`cannot analyze allocation: ${[...dataQuality.warnings, ...eligibility.warnings].join('; ')}`);
-  }
+  const selectedOpportunities = orderedSelectedOpportunities(catalogue.opportunities, parsedInput.opportunityIds);
 
   const rawDataQuality = await tools.analyzeDataQualityTool.execute?.(
     { refresh: parsedInput.refresh, opportunityIds: parsedInput.opportunityIds },
@@ -139,19 +71,45 @@ export async function runAnalyzeSavingsAllocation(
   if (!rawDataQuality) throw new Error('analyzeDataQualityTool did not return a report');
   const dataQuality: DataQualityReport = dataQualityReportSchema.parse(rawDataQuality);
 
-  const eligibility = buildEligibilityReport(selectedOpportunities, parsedInput.opportunityIds);
+  const eligibility = blockIfAllocationCannotRun(
+    buildEligibilityReport(selectedOpportunities, parsedInput.opportunityIds),
+    selectedOpportunities.length
+  );
+
+  if (eligibility.status === 'blocked') {
+    const metricPackets = selectedOpportunities.map(buildMetricPacket);
+    const opportunityAnalyses = metricPackets.map(buildOpportunityAnalysis);
+
+    return analyzeSavingsAllocationOutputSchema.parse({
+      kind: 'savings.allocation.analysis',
+      version: '0.1.0',
+      generatedAt: new Date().toISOString(),
+      input: parsedInput,
+      asset: catalogue.asset,
+      source: catalogue.source,
+      selectedOpportunityIds: selectedOpportunities.map((opportunity) => opportunity.id),
+      selectedOpportunities,
+      eligibility,
+      dataQuality,
+      allocation: null,
+      metricPackets,
+      opportunityAnalyses,
+      strategyNarration: null,
+      boundaries: externalIntegratorBoundaries
+    });
+  }
 
   const rawAllocation = await tools.proposeAllocationTool.execute?.(parsedInput, toolContext);
   if (!rawAllocation) throw new Error('proposeAllocationTool did not return an allocation');
   const allocation: AllocationOutput = allocationOutputSchema.parse(rawAllocation);
 
   const metricPackets: MetricPacket[] = await Promise.all(
-    parsedInput.opportunityIds.map(async (opportunityId) => {
+    selectedOpportunities.map(async (opportunity) => {
       const packet = await tools.getMetricPacketTool.execute?.(
-        { opportunityId, refresh: parsedInput.refresh },
+        { opportunityId: opportunity.id, refresh: parsedInput.refresh },
         toolContext
       );
-      if (!packet) throw new Error(`getMetricPacketTool did not return a packet for ${opportunityId}`);
+      if (!packet) throw new Error(`getMetricPacketTool did not return a packet for ${opportunity.id}`);
       return metricPacketSchema.parse(packet);
     })
   );
@@ -178,14 +136,9 @@ export async function runAnalyzeSavingsAllocation(
     opportunityAnalyses,
     strategyNarration: {
       ...strategyNarration,
-      evidence: uniqueEvidence(opportunityAnalyses)
+      evidence: uniqueOpportunityAnalysisEvidence(opportunityAnalyses)
     },
-    boundaries: {
-      auth: 'external_integrator',
-      signing: 'external_integrator',
-      transactionSending: 'external_integrator',
-      userLedger: 'external_integrator'
-    }
+    boundaries: externalIntegratorBoundaries
   });
 }
 

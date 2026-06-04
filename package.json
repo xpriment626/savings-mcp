@@ -11,9 +11,8 @@
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "test:raw": "tsx scripts/test-raw-requests.ts",
-    "test:mastra-workflow": "tsx scripts/test-mastra-workflow.ts",
-    "request:catalogue": "tsx scripts/raw-request.ts get_usdc_opportunities"
+    "test:raw": "tsx --test tests/savings-mcp.test.ts",
+    "test:mastra-workflow": "tsx --test tests/mastra-workflow.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

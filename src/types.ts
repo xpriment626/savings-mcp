@@ -1,7 +1,25 @@
-export type ProductType = 'lending_reserve' | 'vault';
-export type RiskTier = 'conservative' | 'moderate' | 'elevated' | 'high';
-export type RiskPreference = 'conservative' | 'balanced' | 'aggressive';
-export type AllocationNudge = 'more_conservative' | 'more_aggressive' | 'fewer_pools';
+import type { z } from 'zod';
+import type {
+  allocationNudgeSchema,
+  allocationWeightSchema,
+  opportunityEvidenceSchema,
+  productTypeSchema,
+  riskPreferenceSchema,
+  riskTierSchema,
+  savingsAssetSchema,
+  savingsCatalogueSchema,
+  savingsOpportunitySchema
+} from './core/schemas.js';
+
+export type ProductType = z.infer<typeof productTypeSchema>;
+export type RiskTier = z.infer<typeof riskTierSchema>;
+export type RiskPreference = z.infer<typeof riskPreferenceSchema>;
+export type AllocationNudge = z.infer<typeof allocationNudgeSchema>;
+export type SavingsAsset = z.infer<typeof savingsAssetSchema>;
+export type OpportunityEvidence = z.infer<typeof opportunityEvidenceSchema>;
+export type SavingsOpportunity = z.infer<typeof savingsOpportunitySchema>;
+export type SavingsCatalogue = z.infer<typeof savingsCatalogueSchema>;
+export type AllocationWeight = z.infer<typeof allocationWeightSchema>;
 
 export interface AppConfig {
   host: string;
@@ -13,68 +31,6 @@ export interface AppConfig {
   solanaRpcUrl: string;
   openrouterApiKey: string;
   exaApiKey: string;
-}
-
-export interface SavingsAsset {
-  symbol: 'USDC';
-  mint: string;
-  principal: 'canonical_solana_usdc';
-}
-
-export interface OpportunityEvidence {
-  label: string;
-  url: string;
-  observedAt: string;
-}
-
-export interface SavingsOpportunity {
-  id: string;
-  venue: string;
-  protocol: string;
-  product_type: ProductType;
-  title: string;
-  asset: SavingsAsset;
-  apy: {
-    current: number;
-    source: string;
-    window: string;
-  };
-  tvl: {
-    usd: number;
-  };
-  liquidity: {
-    utilizationPct: number | null;
-    withdrawalBufferPct: number | null;
-  };
-  risk: {
-    tier: RiskTier;
-    score: number;
-    factors: string[];
-    synthesis: string;
-  };
-  flags: {
-    depositable: boolean;
-    simulatable: boolean;
-  };
-  refs: {
-    market?: string;
-    reserve?: string;
-    vault?: string;
-    assetMint?: string;
-  };
-  evidence: OpportunityEvidence[];
-  generated_at: string;
-}
-
-export interface SavingsCatalogue {
-  asset: SavingsAsset;
-  generated_at: string;
-  source: {
-    venue: string;
-    mode: 'fixture' | 'live';
-    baseUrl?: string;
-  };
-  opportunities: SavingsOpportunity[];
 }
 
 export interface FilterOpportunitiesArgs {
@@ -95,16 +51,6 @@ export interface ProposeAllocationArgs {
   riskPreference?: RiskPreference;
   nudges?: AllocationNudge[];
   refresh?: boolean;
-}
-
-export interface AllocationWeight {
-  opportunityId: string;
-  title: string;
-  venue: string;
-  productType: ProductType;
-  riskTier: RiskTier;
-  weightPct: number;
-  apy: number;
 }
 
 export interface JsonRpcRequest {
