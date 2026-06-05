@@ -1,4 +1,5 @@
 import { CANONICAL_SOLANA_USDC_MINT, USDC_ASSET } from '../constants.js';
+import { connectorCapabilities, integrationLimitations, integrationStatusFor } from '../core/capabilities.js';
 import { attachOpportunityDisplay } from '../core/display.js';
 import type { AppConfig, SavingsCatalogue, SavingsOpportunity } from '../types.js';
 import type { VenueAdapter } from './types.js';
@@ -56,6 +57,15 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function connectorFields(extra: readonly string[] = []) {
+  const capabilities = connectorCapabilities({ depositTxKnown: false });
+  return {
+    capabilities,
+    integrationStatus: integrationStatusFor(capabilities),
+    limitations: integrationLimitations(capabilities, extra)
+  };
+}
+
 function normalizeToken(token: JupiterEarnToken, generatedAt: string): SavingsOpportunity | null {
   if (token.assetAddress !== CANONICAL_SOLANA_USDC_MINT) return null;
 
@@ -97,10 +107,7 @@ function normalizeToken(token: JupiterEarnToken, generatedAt: string): SavingsOp
       synthesis:
         'USDC deposited into Jupiter Earn receives jlUSDC exposure; withdrawals depend on Jupiter Lend liquidity and debt-ceiling mechanics rather than a simple reserve idle buffer.'
     },
-    flags: {
-      depositable: true,
-      simulatable: false
-    },
+    ...connectorFields(['Jupiter Earn deposit route requires app-side Jupiter integration beyond this market-data endpoint']),
     refs: {
       vault: typeof token.address === 'string' ? token.address : JUPITER_USDC_RECEIPT_MINT,
       assetMint: CANONICAL_SOLANA_USDC_MINT
@@ -143,7 +150,7 @@ function fixtureCatalogue(generatedAt: string): SavingsCatalogue {
           synthesis:
             'Fixture-backed Jupiter Earn USDC pool with jlUSDC receipt exposure and withdrawal mechanics that differ from lending-reserve idle buffers.'
         },
-        flags: { depositable: true, simulatable: false },
+        ...connectorFields(['fixture-backed Jupiter Earn route is market-data-only']),
         refs: { vault: JUPITER_USDC_RECEIPT_MINT, assetMint: USDC_ASSET.mint },
         evidence: [
           {

@@ -1,4 +1,5 @@
 import { CANONICAL_SOLANA_USDC_MINT, USDC_ASSET } from '../constants.js';
+import { connectorCapabilities, integrationLimitations, integrationStatusFor } from '../core/capabilities.js';
 import { attachOpportunityDisplay } from '../core/display.js';
 import { fixtureCatalogue } from '../fixtures.js';
 import type { AppConfig, ProductType, RiskTier, SavingsCatalogue, SavingsOpportunity } from '../types.js';
@@ -85,6 +86,15 @@ function scoreForTier(tier: RiskTier, utilizationPct = 0, productType: ProductTy
   return Math.min(100, base + utilizationPenalty + complexityPenalty);
 }
 
+function connectorFields(input: { depositTxKnown: boolean; simulationSupported?: boolean }, extra: readonly string[] = []) {
+  const capabilities = connectorCapabilities(input);
+  return {
+    capabilities,
+    integrationStatus: integrationStatusFor(capabilities),
+    limitations: integrationLimitations(capabilities, extra)
+  };
+}
+
 function normalizeLendReserve({
   market,
   reserve,
@@ -132,10 +142,10 @@ function normalizeLendReserve({
         utilizationPct
       )}% utilization and ${Math.round(withdrawalBufferPct)}% idle withdrawal buffer.`
     },
-    flags: {
-      depositable: isPrimary,
-      simulatable: isPrimary
-    },
+    ...connectorFields(
+      { depositTxKnown: true },
+      isPrimary ? ['main-market reserve refs are normalized'] : ['isolated-market reserve refs are normalized but require app-side policy review']
+    ),
     refs: {
       market: market.lendingMarket,
       reserve: reserve.reserve,
@@ -194,7 +204,7 @@ function normalizeVault({
       synthesis:
         'Managed USDC vault; expected return and exit behavior depend on the curator and the underlying Kamino reserve allocations.'
     },
-    flags: { depositable: false, simulatable: false },
+    ...connectorFields({ depositTxKnown: false }, ['Kamino Earn vault transaction mechanics are not normalized by this connector']),
     refs: { vault: vault.address, assetMint: tokenMint },
     evidence: [
       {

@@ -1,4 +1,5 @@
 import { CANONICAL_SOLANA_USDC_MINT, USDC_ASSET } from '../constants.js';
+import { connectorCapabilities, integrationLimitations, integrationStatusFor } from '../core/capabilities.js';
 import { attachOpportunityDisplay } from '../core/display.js';
 import type { AppConfig, RiskTier, SavingsCatalogue, SavingsOpportunity } from '../types.js';
 import type { VenueAdapter } from './types.js';
@@ -104,6 +105,15 @@ function scoreForTier(tier: RiskTier, utilizationPct: number): number {
   return Math.min(100, base + utilizationPenalty);
 }
 
+function connectorFields(input: { depositTxKnown: boolean; simulationSupported?: boolean }, extra: readonly string[] = []) {
+  const capabilities = connectorCapabilities(input);
+  return {
+    capabilities,
+    integrationStatus: integrationStatusFor(capabilities),
+    limitations: integrationLimitations(capabilities, extra)
+  };
+}
+
 function normalizeReserve(input: {
   market: SaveMarketConfig;
   configReserve: SaveReserveConfig;
@@ -156,10 +166,10 @@ function normalizeReserve(input: {
         withdrawalBufferPct === null ? 'unknown' : `${Math.round(withdrawalBufferPct)}%`
       } idle withdrawal buffer.`
     },
-    flags: {
-      depositable: isPrimary,
-      simulatable: isPrimary
-    },
+    ...connectorFields(
+      { depositTxKnown: true },
+      isPrimary ? ['main Save/Solend reserve refs are normalized'] : ['non-primary Save/Solend reserve refs require app-side policy review']
+    ),
     refs: {
       market: String(input.market.address ?? 'main'),
       reserve: reserveAddress,
@@ -207,7 +217,7 @@ function fixtureCatalogue(generatedAt: string): SavingsCatalogue {
           factors: ['main Save/Solend market reserve', 'normal utilization', 'classic lending reserve mechanics'],
           synthesis: 'Fixture-backed Save/Solend main USDC reserve with moderate utilization and classic reserve mechanics.'
         },
-        flags: { depositable: true, simulatable: true },
+        ...connectorFields({ depositTxKnown: true }, ['fixture-backed Save/Solend reserve refs are illustrative']),
         refs: {
           market: '4UpD2fh7xH3VP9QQaXtsS1YY3bxzWhtfpks7FatyKvdY',
           reserve: 'BgxfHJDzm44T7XG68MYKx7YisTjZu73tVovyZSjJMpmw',

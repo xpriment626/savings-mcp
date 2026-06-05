@@ -44,6 +44,25 @@ describe('analyzeSavingsAllocationWorkflow', () => {
     assert.equal(output.opportunityAnalyses.every((analysis) => analysis.evidence.length > 0), true);
   });
 
+  it('allocates across selected market-data-only opportunities instead of treating them as ineligible', async () => {
+    const input = {
+      opportunityIds: ['kamino:lend:main-usdc', 'kamino:earn:usdc-core', 'jupiter:earn:usdc'],
+      amountUsd: 10_000,
+      riskPreference: 'balanced' as const
+    };
+
+    const output = analyzeSavingsAllocationOutputSchema.parse(await runAnalyzeSavingsAllocation(input, fixtureConfig));
+
+    assert.equal(output.eligibility.status, 'ok');
+    assert.deepEqual(output.eligibility.ineligible, []);
+    assert.ok(output.allocation);
+    assert.deepEqual(
+      new Set(output.allocation.allocation.weights.map((weight) => weight.opportunityId)),
+      new Set(input.opportunityIds)
+    );
+    assert.equal(output.selectedOpportunities.some((opportunity) => opportunity.integrationStatus === 'market_data_only'), true);
+  });
+
   it('returns a structured blocked payload when requested opportunities are unavailable', async () => {
     const input = {
       opportunityIds: ['missing-a', 'missing-b'],

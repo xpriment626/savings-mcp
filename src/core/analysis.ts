@@ -109,26 +109,30 @@ export function analyzeCapacityUtilization(packet: MetricPacket): CapacityUtiliz
   const utilization = packet.liquidity.utilizationPct;
   const thinVenue = packet.scale.tvlUsd < 10_000_000;
   const highUtilization = utilization !== null && utilization >= 85;
-  const cappedOrUnavailable = !packet.flags.depositable || !packet.flags.simulatable;
+  const connectorLimited = !packet.capabilities.depositTxKnown || !packet.capabilities.simulationSupported;
   const fragmentedLiquidity = packet.scale.tvlUsd < 25_000_000 || packet.productType === 'vault';
 
   const warnings: string[] = [];
   if (thinVenue) warnings.push('venue capacity is thin for large USDC deposits');
   if (highUtilization) warnings.push('high utilization reduces available exit liquidity');
-  if (!packet.flags.depositable) warnings.push('opportunity is not currently depositable');
-  if (!packet.flags.simulatable) warnings.push('opportunity is not currently simulatable');
+  if (!packet.capabilities.depositTxKnown) {
+    warnings.push('connector provides market and risk data only; deposit transaction path is app-side or protocol-SDK work');
+  }
+  if (!packet.capabilities.simulationSupported) warnings.push('simulation is an app-side responsibility for this opportunity');
 
   return capacityUtilizationAnalysisSchema.parse({
     opportunityId: packet.opportunityId,
-    summary: shortSummary(`${packet.venue} capacity is ${packet.scale.tvlUsd} TVL with depositable=${packet.flags.depositable}.`),
+    summary: shortSummary(
+      `${packet.venue} capacity is ${packet.scale.tvlUsd} TVL; connector status is ${packet.capabilities.depositTxKnown ? 'tx blueprint known' : 'market data only'}.`
+    ),
     tvlUsd: packet.scale.tvlUsd,
     utilizationPct: utilization,
-    depositable: packet.flags.depositable,
-    simulatable: packet.flags.simulatable,
+    depositTxKnown: packet.capabilities.depositTxKnown,
+    simulationSupported: packet.capabilities.simulationSupported,
     capacitySignals: {
       thinVenue,
       highUtilization,
-      cappedOrUnavailable,
+      connectorLimited,
       fragmentedLiquidity
     },
     warnings,
@@ -143,24 +147,24 @@ export function analyzeStrategyExposure(packet: MetricPacket): StrategyExposureA
 
   if (packet.productType === 'lending_reserve') exposureFlags.push('simple_reserve');
   if (packet.productType === 'vault') exposureFlags.push('managed_vault');
-  if (packet.flags.usesExternalStrategies) exposureFlags.push('external_strategy');
-  if (packet.flags.hasLpExposure) exposureFlags.push('lp_exposure');
+  if (packet.capabilities.usesExternalStrategies) exposureFlags.push('external_strategy');
+  if (packet.capabilities.hasLpExposure) exposureFlags.push('lp_exposure');
 
   if (packet.venue.toLowerCase() === 'kamino' && packet.productType === 'vault') {
     routingNotes.push('Kamino Earn vault routing depends on curator allocation across underlying reserves');
   }
-  if (packet.venue.toLowerCase() === 'meteora' || packet.flags.hasLpExposure) {
+  if (packet.venue.toLowerCase() === 'meteora' || packet.capabilities.hasLpExposure) {
     routingNotes.push('Meteora-style LP routing should be treated as strategy exposure, not plain lending');
   }
   if (packet.productType === 'vault') warnings.push('managed vault allocations require curator and underlying-reserve review');
-  if (packet.flags.hasLpExposure) warnings.push('LP exposure can introduce impermanent loss or pool imbalance risk');
+  if (packet.capabilities.hasLpExposure) warnings.push('LP exposure can introduce impermanent loss or pool imbalance risk');
 
   return strategyExposureAnalysisSchema.parse({
     opportunityId: packet.opportunityId,
     summary: shortSummary(`${packet.venue} ${packet.productType} exposure flags: ${exposureFlags.join(', ')}.`),
     productType: packet.productType,
-    usesExternalStrategies: packet.flags.usesExternalStrategies,
-    hasLpExposure: packet.flags.hasLpExposure,
+    usesExternalStrategies: packet.capabilities.usesExternalStrategies,
+    hasLpExposure: packet.capabilities.hasLpExposure,
     exposureFlags,
     routingNotes,
     warnings,
@@ -169,7 +173,7 @@ export function analyzeStrategyExposure(packet: MetricPacket): StrategyExposureA
 }
 
 function capacityRiskLevel(analysis: CapacityUtilizationAnalysis): VenueRiskDecomposition['components']['capacity'] {
-  if (analysis.capacitySignals.highUtilization || analysis.capacitySignals.cappedOrUnavailable) return 'high';
+  if (analysis.capacitySignals.highUtilization) return 'high';
   if (analysis.capacitySignals.thinVenue || analysis.capacitySignals.fragmentedLiquidity) return 'medium';
   return 'low';
 }

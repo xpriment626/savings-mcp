@@ -70,6 +70,31 @@ describe('Savings MCP raw HTTP endpoint', () => {
     assert.deepEqual(body.error, undefined);
     assert.equal(result.tools?.some((tool) => tool.name === 'get_usdc_opportunities'), true);
     assert.equal(result.tools?.some((tool) => tool.name === 'propose_allocation'), true);
+    for (const toolName of [
+      'get_opportunity',
+      'get_metric_packet',
+      'calculate_rate_metrics',
+      'calculate_liquidity_metrics',
+      'calculate_capacity_metrics',
+      'calculate_strategy_exposure',
+      'screen_opportunities',
+      'rank_opportunities',
+      'calculate_blended_apy',
+      'calculate_blended_risk',
+      'calculate_concentration',
+      'calculate_rebalance_delta',
+      'validate_allocation_inputs',
+      'get_history_sample_schema',
+      'validate_history_samples',
+      'summarize_history_quality',
+      'calculate_rate_stability',
+      'calculate_yield_percentiles',
+      'calculate_historical_liquidity_risk',
+      'detect_history_anomalies',
+      'compare_historical_opportunities'
+    ]) {
+      assert.equal(result.tools?.some((tool) => tool.name === toolName), true, `${toolName} missing`);
+    }
     exposedToolNames = new Set((result.tools ?? []).map((tool) => String(tool.name)));
 
     for (const tool of result.tools ?? []) {
@@ -99,6 +124,15 @@ describe('Savings MCP raw HTTP endpoint', () => {
         venue?: string;
         asset?: { symbol?: string };
         apy?: { current?: unknown };
+        capabilities?: {
+          marketData?: boolean;
+          riskData?: boolean;
+          depositTxKnown?: boolean;
+          simulationSupported?: boolean;
+          executionSupported?: boolean;
+        };
+        integrationStatus?: string;
+        limitations?: string[];
         display?: {
           displayTitle?: string;
           headlineApyPct?: number;
@@ -114,6 +148,20 @@ describe('Savings MCP raw HTTP endpoint', () => {
     assert.equal(payload.asset?.mint, 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
     assert.equal(payload.opportunities?.every((opp) => opp.asset?.symbol === 'USDC'), true);
     assert.equal(payload.opportunities?.every((opp) => Number.isFinite(opp.apy?.current)), true);
+    assert.equal(payload.opportunities?.every((opp) => opp.capabilities?.marketData === true), true);
+    assert.equal(payload.opportunities?.every((opp) => opp.capabilities?.riskData === true), true);
+    assert.equal(payload.opportunities?.every((opp) => opp.capabilities?.executionSupported === false), true);
+    assert.equal(payload.opportunities?.every((opp) => Array.isArray(opp.limitations)), true);
+    assert.equal(
+      payload.opportunities?.every((opp) =>
+        ['market_data_only', 'tx_blueprint_known', 'simulation_supported'].includes(String(opp.integrationStatus))
+      ),
+      true
+    );
+    assert.equal(
+      payload.opportunities?.every((opp) => !String(opp.display?.status).startsWith('not_')),
+      true
+    );
     assert.equal(payload.opportunities?.every((opp) => typeof opp.display?.displayTitle === 'string'), true);
     assert.equal(payload.opportunities?.every((opp) => Number.isFinite(opp.display?.headlineApyPct)), true);
     assert.equal(payload.opportunities?.every((opp) => typeof opp.display?.riskBadge === 'string'), true);
@@ -158,7 +206,7 @@ describe('Savings MCP raw HTTP endpoint', () => {
     const body = await rpc('tools/call', {
       name: 'propose_allocation',
       arguments: {
-        opportunityIds: ['kamino:lend:main-usdc', 'jupiter:earn:usdc', 'save:lend:main-usdc'],
+        opportunityIds: ['kamino:lend:main-usdc', 'kamino:earn:usdc-core', 'jupiter:earn:usdc'],
         amountUsd: 10_000,
         riskPreference: 'balanced'
       }
@@ -185,7 +233,7 @@ describe('Savings MCP raw HTTP endpoint', () => {
     assert.equal(weights.length, 3);
     assert.deepEqual(
       new Set(weights.map((weight) => weight.opportunityId)),
-      new Set(['kamino:lend:main-usdc', 'jupiter:earn:usdc', 'save:lend:main-usdc'])
+      new Set(['kamino:lend:main-usdc', 'kamino:earn:usdc-core', 'jupiter:earn:usdc'])
     );
     assert.equal(Math.round(totalWeight), 100);
     assert.equal(payload.allocation?.rationale?.includes('deterministic'), true);
@@ -193,5 +241,65 @@ describe('Savings MCP raw HTTP endpoint', () => {
     assert.equal(payload.display?.status, 'preview_only');
     assert.equal(typeof payload.display?.riskBadge, 'string');
     assert.equal(payload.display?.availableFollowups?.every((toolName) => exposedToolNames.has(toolName)), true);
+  });
+
+  it('exposes composable analytics primitives over raw MCP structuredContent', async () => {
+    const opportunity = await rpc('tools/call', {
+      name: 'get_opportunity',
+      arguments: { opportunityId: 'jupiter:earn:usdc' }
+    });
+    const metricPacket = await rpc('tools/call', {
+      name: 'get_metric_packet',
+      arguments: { opportunityId: 'jupiter:earn:usdc' }
+    });
+    const screened = await rpc('tools/call', {
+      name: 'screen_opportunities',
+      arguments: { integrationStatuses: ['market_data_only'], minTvlUsd: 1_000_000 }
+    });
+    const blended = await rpc('tools/call', {
+      name: 'calculate_blended_apy',
+      arguments: {
+        weights: [
+          { opportunityId: 'kamino:lend:main-usdc', weightPct: 50 },
+          { opportunityId: 'jupiter:earn:usdc', weightPct: 50 }
+        ]
+      }
+    });
+
+    assert.deepEqual(opportunity.error, undefined);
+    assert.deepEqual(metricPacket.error, undefined);
+    assert.deepEqual(screened.error, undefined);
+    assert.deepEqual(blended.error, undefined);
+    assert.equal(structuredContent<{ opportunity?: { id?: string } }>(opportunity).opportunity?.id, 'jupiter:earn:usdc');
+    assert.equal(structuredContent<{ opportunityId?: string }>(metricPacket).opportunityId, 'jupiter:earn:usdc');
+    assert.equal(
+      structuredContent<{ included?: Array<{ integrationStatus?: string }> }>(screened).included?.every(
+        (item) => item.integrationStatus === 'market_data_only'
+      ),
+      true
+    );
+    assert.equal(Number.isFinite(structuredContent<{ blendedApyPct?: number }>(blended).blendedApyPct), true);
+  });
+
+  it('exposes stateless BYOD historical analytics over raw MCP structuredContent', async () => {
+    const samples = [
+      { opportunityId: 'kamino:lend:main-usdc', timestamp: '2026-06-01T00:00:00.000Z', apy: 0.04, tvlUsd: 160_000_000, utilizationPct: 70, withdrawalBufferPct: 30, source: 'test' },
+      { opportunityId: 'kamino:lend:main-usdc', timestamp: '2026-06-02T00:00:00.000Z', apy: 0.041, tvlUsd: 162_000_000, utilizationPct: 71, withdrawalBufferPct: 29, source: 'test' },
+      { opportunityId: 'kamino:lend:main-usdc', timestamp: '2026-06-03T00:00:00.000Z', apy: 0.039, tvlUsd: 161_000_000, utilizationPct: 72, withdrawalBufferPct: 28, source: 'test' }
+    ];
+    const validation = await rpc('tools/call', {
+      name: 'validate_history_samples',
+      arguments: { samples }
+    });
+    const stability = await rpc('tools/call', {
+      name: 'calculate_rate_stability',
+      arguments: { samples }
+    });
+
+    assert.deepEqual(validation.error, undefined);
+    assert.deepEqual(stability.error, undefined);
+    assert.equal(structuredContent<{ sampleCount?: number }>(validation).sampleCount, 3);
+    assert.equal(structuredContent<{ mode?: string; regime?: string }>(stability).mode, 'samples');
+    assert.equal(structuredContent<{ mode?: string; regime?: string }>(stability).regime, 'stable');
   });
 });

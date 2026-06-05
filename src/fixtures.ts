@@ -1,6 +1,16 @@
 import { USDC_ASSET } from './constants.js';
+import { connectorCapabilities, integrationLimitations, integrationStatusFor } from './core/capabilities.js';
 import { attachOpportunityDisplay } from './core/display.js';
 import type { SavingsCatalogue } from './types.js';
+
+function connectorFields(input: { depositTxKnown: boolean; simulationSupported?: boolean }, extra: readonly string[] = []) {
+  const capabilities = connectorCapabilities(input);
+  return {
+    capabilities,
+    integrationStatus: integrationStatusFor(capabilities),
+    limitations: integrationLimitations(capabilities, extra)
+  };
+}
 
 export function fixtureCatalogue(generatedAt = new Date().toISOString()): SavingsCatalogue {
   return {
@@ -28,7 +38,7 @@ export function fixtureCatalogue(generatedAt = new Date().toISOString()): Saving
           synthesis:
             'Blue-chip USDC lending on Kamino main market with deep supplied liquidity and simple reserve mechanics.'
         },
-        flags: { depositable: true, simulatable: true },
+        ...connectorFields({ depositTxKnown: true }, ['fixture-backed Kamino reserve refs are illustrative']),
         refs: {
           market: 'main',
           reserve: 'fixture-main-usdc',
@@ -60,7 +70,7 @@ export function fixtureCatalogue(generatedAt = new Date().toISOString()): Saving
           synthesis:
             'Managed USDC vault with higher yield potential, but risk follows curator choices and underlying reserve mix.'
         },
-        flags: { depositable: false, simulatable: false },
+        ...connectorFields({ depositTxKnown: false }, ['fixture-backed Kamino vault deposit mechanics are not normalized']),
         refs: {
           vault: 'fixture-usdc-core-vault',
           assetMint: USDC_ASSET.mint
@@ -91,7 +101,7 @@ export function fixtureCatalogue(generatedAt = new Date().toISOString()): Saving
           synthesis:
             'Higher-yield USDC lending in a thinner market; high utilization can make exits less immediate.'
         },
-        flags: { depositable: false, simulatable: false },
+        ...connectorFields({ depositTxKnown: true }, ['fixture-backed isolated reserve refs are illustrative']),
         refs: {
           market: 'isolated',
           reserve: 'fixture-alt-usdc',

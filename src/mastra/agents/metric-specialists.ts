@@ -59,7 +59,7 @@ export const CapacityUtilizationAgent = createStructuredAgent({
   id: 'capacity-utilization-agent',
   name: 'CapacityUtilizationAgent',
   instructions: `${commonBoundary}
-Analyze TVL, utilization, caps, depositability, and thin or fragmented venue capacity warnings.`,
+Analyze TVL, utilization, connector capability limits, and thin or fragmented venue capacity warnings.`,
   outputSchema: capacityUtilizationAnalysisSchema
 });
 

@@ -7,13 +7,6 @@ function roundPct(value: number): number {
   return Math.round(value * 10_000) / 100;
 }
 
-function opportunityStatus(opportunity: OpportunityWithoutDisplay): SavingsOpportunity['display']['status'] {
-  if (opportunity.flags.depositable && opportunity.flags.simulatable) return 'depositable';
-  if (!opportunity.flags.depositable) return 'not_depositable';
-  if (!opportunity.flags.simulatable) return 'not_simulatable';
-  return 'needs_review';
-}
-
 function liquidityBadge(opportunity: OpportunityWithoutDisplay): string {
   const buffer = opportunity.liquidity.withdrawalBufferPct;
   const utilization = opportunity.liquidity.utilizationPct;
@@ -25,8 +18,7 @@ function liquidityBadge(opportunity: OpportunityWithoutDisplay): string {
 
 function opportunityWarnings(opportunity: OpportunityWithoutDisplay): string[] {
   const warnings: string[] = [];
-  if (!opportunity.flags.depositable) warnings.push('not currently marked depositable');
-  if (!opportunity.flags.simulatable) warnings.push('not currently simulatable');
+  if (opportunity.integrationStatus === 'market_data_only') warnings.push('market-data-only connector coverage');
   if (opportunity.product_type === 'vault') warnings.push('managed strategy exposure requires review');
   if (opportunity.liquidity.utilizationPct !== null && opportunity.liquidity.utilizationPct >= 85) {
     warnings.push('high utilization can slow exits');
@@ -41,9 +33,15 @@ export function buildOpportunityDisplay(opportunity: OpportunityWithoutDisplay):
     headlineApyPct: roundPct(opportunity.apy.current),
     riskBadge: `${opportunity.risk.tier} risk`,
     liquidityBadge: liquidityBadge(opportunity),
-    status: opportunityStatus(opportunity),
+    status: opportunity.integrationStatus,
     primaryWarnings: opportunityWarnings(opportunity),
     availableFollowups: [
+      'get_opportunity',
+      'get_metric_packet',
+      'calculate_rate_metrics',
+      'calculate_liquidity_metrics',
+      'calculate_capacity_metrics',
+      'calculate_strategy_exposure',
       'get_usdc_opportunities',
       'compare_opportunities',
       'propose_allocation'
@@ -80,7 +78,12 @@ export function buildAllocationDisplay(input: {
     availableFollowups: [
       'get_usdc_opportunities',
       'compare_opportunities',
-      'propose_allocation'
+      'propose_allocation',
+      'validate_allocation_inputs',
+      'calculate_blended_apy',
+      'calculate_blended_risk',
+      'calculate_concentration',
+      'calculate_rebalance_delta'
     ]
   };
 }
@@ -95,7 +98,9 @@ export function compareEntryFromOpportunity(opportunity: SavingsOpportunity): Co
     tvl: opportunity.tvl,
     liquidity: opportunity.liquidity,
     risk: opportunity.risk,
-    flags: opportunity.flags,
+    capabilities: opportunity.capabilities,
+    integrationStatus: opportunity.integrationStatus,
+    limitations: opportunity.limitations,
     evidence: opportunity.evidence,
     display: opportunity.display
   };

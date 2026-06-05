@@ -1,13 +1,51 @@
 # Savings MCP
 
-Agent-native USDC savings surface for Solana. The v0 server exposes a raw JSON-RPC MCP endpoint with canonical Solana USDC opportunity discovery, comparison, and deterministic allocation previews across supported venues.
+Agent-native USDC savings surface for Solana. The v0 server exposes a raw JSON-RPC MCP endpoint with canonical Solana USDC opportunity discovery, composable current-snapshot analytics, and stateless BYOD historical analytics across supported venues.
 
 The current scope is read-only:
 
 - canonical Solana USDC only: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`
 - supported venues: Kamino, Jupiter Lend, Save/Solend
 - allocation weights are deterministic library math
-- execution, signing, and deposit simulation are not wired yet
+- transaction construction, deposit simulation, execution, signing, and ledgers stay with the integrating app
+
+## Tool Slices
+
+Slice 1 is live venue data normalization:
+
+- `get_usdc_opportunities`
+- `get_opportunity`
+- `compare_opportunities`
+- `get_metric_packet`
+
+These tools return all normalized opportunities they can see. Connector `capabilities`, `integrationStatus`, and `limitations` describe Savings MCP coverage, not whether a public-chain pool is inherently depositable by another app.
+
+Slice 2 is current-snapshot analytics:
+
+- `calculate_rate_metrics`
+- `calculate_liquidity_metrics`
+- `calculate_capacity_metrics`
+- `calculate_strategy_exposure`
+- `calculate_opportunity_analytics`
+- `screen_opportunities`
+- `rank_opportunities`
+- `validate_allocation_inputs`
+- `calculate_blended_apy`
+- `calculate_blended_risk`
+- `calculate_concentration`
+- `calculate_rebalance_delta`
+- `propose_allocation`
+
+Slice 3 is stateless historical analytics. Integrators bring samples or precomputed summaries; Savings MCP does not store service-wide history:
+
+- `get_history_sample_schema`
+- `validate_history_samples`
+- `summarize_history_quality`
+- `calculate_rate_stability`
+- `calculate_yield_percentiles`
+- `calculate_historical_liquidity_risk`
+- `detect_history_anomalies`
+- `compare_historical_opportunities`
 
 ## Pure Infra Boundary
 
@@ -35,9 +73,12 @@ Folder map:
 
 - `src/core/schemas.ts`: canonical zod schemas for opportunities, metric packets, data quality, allocation inputs/outputs, and workflow payloads.
 - `src/core/display.ts`: deterministic display summaries for chat agents and lightweight app renderers.
-- `src/core/metrics.ts`: deterministic metric packet, data-quality, and eligibility helpers.
+- `src/core/capabilities.ts`: connector capability/status helpers that separate market data from app-side transaction support.
+- `src/core/metrics.ts`: deterministic metric packet, data-quality, and allocation-readiness helpers.
 - `src/core/analysis.ts`: deterministic specialist analysis and narration helpers.
 - `src/core/tool-args.ts`: shared zod-backed argument parsing for raw MCP and Mastra tools.
+- `src/current-analytics.ts`: deterministic current-snapshot opportunity, metric, screen, rank, allocation, concentration, and rebalance helpers.
+- `src/history-analytics.ts`: stateless BYOD historical validation, stability, percentile, liquidity-risk, anomaly, and comparison helpers.
 - `src/venues/types.ts`: venue adapter contract for normalized USDC savings venues.
 - `src/venues/kamino.ts`: Kamino adapter implementation for fixture/live USDC catalogue data.
 - `src/venues/jupiter-lend.ts`: Jupiter Lend adapter implementation for fixture/live USDC Earn data.
@@ -56,6 +97,27 @@ Current tools:
 - `proposeAllocationTool`
 - `getMetricPacketTool`
 - `analyzeDataQualityTool`
+- `getOpportunityTool`
+- `calculateOpportunityAnalyticsTool`
+- `calculateRateMetricsTool`
+- `calculateLiquidityMetricsTool`
+- `calculateCapacityMetricsTool`
+- `calculateStrategyExposureTool`
+- `screenOpportunitiesTool`
+- `rankOpportunitiesTool`
+- `calculateBlendedApyTool`
+- `calculateBlendedRiskTool`
+- `calculateConcentrationTool`
+- `calculateRebalanceDeltaTool`
+- `validateAllocationInputsTool`
+- `getHistorySampleSchemaTool`
+- `validateHistorySamplesTool`
+- `summarizeHistoryQualityTool`
+- `calculateRateStabilityTool`
+- `calculateYieldPercentilesTool`
+- `calculateHistoricalLiquidityRiskTool`
+- `detectHistoryAnomaliesTool`
+- `compareHistoricalOpportunitiesTool`
 
 The Mastra layer does not add auth, wallet signing, account persistence, transaction sending, or user ledgers.
 
@@ -65,7 +127,7 @@ The first specialist agents consume `metricPacketSchema`, allocation outputs, an
 
 - `RateQualityAgent`: APY source/window, base versus rewards, stability confidence, and missing history.
 - `ExitLiquidityAgent`: withdrawal mode, utilization, buffers, debt-ceiling notes, LP exit notes, and exit risk level.
-- `CapacityUtilizationAgent`: TVL, utilization, depositability, caps/unavailability, and thin or fragmented venue warnings.
+- `CapacityUtilizationAgent`: TVL, utilization, connector capability limits, and thin or fragmented venue warnings.
 - `StrategyExposureAgent`: managed vaults, external strategy routing, Kamino Earn/Meteora notes, and LP exposure flags.
 - `VenueRiskDecomposerAgent`: specialist-output synthesis into comparable venue/product risk.
 - `StrategyNarratorAgent`: narration for fixed deterministic allocations; it never changes weights.
@@ -74,7 +136,7 @@ Each agent exports a zod `outputSchema`. Fixture-mode tests use a stable determi
 
 ### Allocation Analysis Workflow
 
-`analyzeSavingsAllocationWorkflow` composes the Savings MCP tools and metric specialists into one portable payload for integrating apps.
+`analyzeSavingsAllocationWorkflow` remains available as a parallel compatibility workflow that composes the Savings MCP tools and metric specialists into one portable payload for integrating apps. The primary infra contract is now the composable raw/Mastra tool surface above.
 
 Input:
 
@@ -87,7 +149,7 @@ Input:
 Output:
 
 - selected opportunities
-- deterministic data-quality and eligibility reports
+- deterministic data-quality and allocation-readiness reports
 - deterministic allocation
 - metric packets
 - specialist analyses
@@ -171,17 +233,19 @@ Manual prompts for the first smoke session:
 Expected behavior:
 
 - The chat agent discovers `get_usdc_opportunities`, `compare_opportunities`, and `propose_allocation`.
+- More granular clients can call `get_metric_packet`, metric calculators, screen/rank tools, allocation math tools, and BYOD history tools directly.
 - The agent reasons from `structuredContent`, not by parsing JSON text from `content`.
-- Opportunity responses include stable IDs, source/provenance, APY, TVL, liquidity, risk, flags, evidence, and `display` summaries.
+- Opportunity responses include stable IDs, source/provenance, APY, TVL, liquidity, risk, connector `capabilities`, `integrationStatus`, `limitations`, evidence, and `display` summaries.
 - Fixture responses include Kamino, Jupiter Lend, and Save/Solend USDC opportunities.
 - Live responses include per-venue `venueReports`; a temporarily unavailable venue is surfaced as a report/warning instead of crashing the whole catalogue.
 - Allocation responses are explicitly preview-only and keep auth/signing/transaction/ledger responsibilities outside Savings MCP.
-- Any warnings about depositability, simulation, managed vault exposure, or high utilization stay visible to the model.
+- Any limitations around connector transaction-blueprint coverage, simulation support, managed vault exposure, or high utilization stay visible to the model without hiding market data.
 
 Known live-data limitations:
 
 - Jupiter Lend USDC Earn is normalized as a `vault`-style opportunity because it exposes jlUSDC receipt-token and debt-ceiling withdrawal mechanics, not a reserve-style utilization model. Utilization is `null`; withdrawal buffer reflects currently withdrawable assets when available.
 - Save/Solend uses public market config and reserve detail endpoints for catalogue data. User obligation state is intentionally not read, so the adapter does not infer whether a user deposit is serving as collateral for liabilities.
+- `integrationStatus` describes what this MCP connector has normalized (`market_data_only`, `tx_blueprint_known`, or `simulation_supported`). It is not a universal statement that a public-chain pool can or cannot be deposited into by another app or wallet.
 
 ## Env Pass From Fabrick
 

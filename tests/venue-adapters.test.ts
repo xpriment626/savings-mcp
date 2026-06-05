@@ -23,6 +23,12 @@ describe('venue adapter contract', () => {
     assert.equal(catalogue.source.mode, 'fixture');
     assert.equal(catalogue.opportunities.every((opportunity) => opportunity.id.startsWith('kamino:')), true);
     assert.equal(catalogue.opportunities.every((opportunity) => typeof opportunity.display.displayTitle === 'string'), true);
+    assert.equal(catalogue.opportunities.every((opportunity) => opportunity.capabilities.marketData), true);
+    assert.equal(catalogue.opportunities.every((opportunity) => opportunity.capabilities.executionSupported === false), true);
+    assert.equal(
+      catalogue.opportunities.every((opportunity) => !opportunity.display.status.startsWith('not_')),
+      true
+    );
   });
 
   it('lists fixture-backed Jupiter Lend USDC opportunity through the adapter', async () => {
@@ -37,6 +43,8 @@ describe('venue adapter contract', () => {
     assert.equal(catalogue.source.mode, 'fixture');
     assert.deepEqual(catalogue.opportunities.map((opportunity) => opportunity.id), ['jupiter:earn:usdc']);
     assert.equal(catalogue.opportunities[0]?.asset.symbol, 'USDC');
+    assert.equal(catalogue.opportunities[0]?.integrationStatus, 'market_data_only');
+    assert.equal(catalogue.opportunities[0]?.capabilities.depositTxKnown, false);
     assert.equal(catalogue.opportunities[0]?.display.availableFollowups.includes('propose_allocation'), true);
   });
 
@@ -52,6 +60,8 @@ describe('venue adapter contract', () => {
     assert.equal(catalogue.source.mode, 'fixture');
     assert.deepEqual(catalogue.opportunities.map((opportunity) => opportunity.id), ['save:lend:main-usdc']);
     assert.equal(catalogue.opportunities[0]?.product_type, 'lending_reserve');
+    assert.equal(catalogue.opportunities[0]?.integrationStatus, 'tx_blueprint_known');
+    assert.equal(catalogue.opportunities[0]?.capabilities.depositTxKnown, true);
     assert.equal(Number.isFinite(catalogue.opportunities[0]?.liquidity.utilizationPct), true);
   });
 

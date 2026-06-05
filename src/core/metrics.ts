@@ -45,9 +45,8 @@ export function buildMetricPacket(opportunity: SavingsOpportunity): MetricPacket
       mint: opportunity.refs.vault,
       symbol: opportunity.product_type === 'vault' ? opportunity.title : undefined
     },
-    flags: {
-      depositable: opportunity.flags.depositable,
-      simulatable: opportunity.flags.simulatable,
+    capabilities: {
+      ...opportunity.capabilities,
       requiresKyc: false,
       accessGated: false,
       hasLpExposure: false,
@@ -62,7 +61,7 @@ function opportunityWarnings(opportunity: SavingsOpportunity): string[] {
   if (opportunity.evidence.length === 0) warnings.push('missing evidence');
   if (!Number.isFinite(opportunity.apy.current)) warnings.push('APY is not finite');
   if (opportunity.tvl.usd <= 0) warnings.push('TVL is missing or zero');
-  if (!opportunity.flags.depositable) warnings.push('opportunity is not currently marked depositable');
+  warnings.push(...opportunity.limitations);
   if (opportunity.product_type === 'vault') warnings.push('managed vault strategy details are not fully normalized yet');
   return warnings;
 }
@@ -97,8 +96,6 @@ export function buildDataQualityReport(
 
 function eligibilityReasons(opportunity: SavingsOpportunity): string[] {
   const reasons: string[] = [];
-  if (!opportunity.flags.depositable) reasons.push('opportunity is not currently depositable');
-  if (!opportunity.flags.simulatable) reasons.push('opportunity is not currently simulatable');
   if (opportunity.evidence.length === 0) reasons.push('opportunity has no evidence links');
   if (!Number.isFinite(opportunity.apy.current)) reasons.push('opportunity APY is not finite');
   return reasons;

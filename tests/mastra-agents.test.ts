@@ -86,17 +86,19 @@ describe('Savings Mastra metric-specialist agents', () => {
     assert.equal(output.evidence.length, 1);
   });
 
-  it('CapacityUtilizationAgent flags thin or non-depositable venues', () => {
+  it('CapacityUtilizationAgent separates venue capacity from connector simulation support', () => {
     const packet = buildMetricPacket(isolatedReserve);
 
     const output = capacityUtilizationAnalysisSchema.parse(analyzeCapacityUtilization(packet));
 
     assert.equal(output.opportunityId, 'kamino:lend:alt-usdc');
     assert.equal(output.tvlUsd, 4_200_000);
-    assert.equal(output.depositable, false);
+    assert.equal(output.depositTxKnown, true);
+    assert.equal(output.simulationSupported, false);
     assert.equal(output.capacitySignals.thinVenue, true);
     assert.equal(output.capacitySignals.highUtilization, true);
-    assert.equal(output.warnings.includes('opportunity is not currently depositable'), true);
+    assert.equal(output.capacitySignals.connectorLimited, true);
+    assert.equal(output.warnings.includes('simulation is an app-side responsibility for this opportunity'), true);
   });
 
   it('StrategyExposureAgent separates vault/external strategy exposure from reserve exposure', () => {

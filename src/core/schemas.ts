@@ -7,6 +7,12 @@ export const productTypeSchema = z.enum(['lending_reserve', 'vault']);
 export const withdrawalModeSchema = z.enum(['instant', 'debt_ceiling', 'buffer', 'epoch', 'lp_exit', 'unknown']);
 export const confidenceSchema = z.enum(['low', 'medium', 'high']);
 export const riskLevelSchema = z.enum(['low', 'medium', 'high']);
+export const integrationStatusSchema = z.enum([
+  'market_data_only',
+  'tx_blueprint_known',
+  'simulation_supported',
+  'execution_supported'
+]);
 
 export const savingsAssetSchema = z.object({
   symbol: z.literal('USDC'),
@@ -25,9 +31,17 @@ export const opportunityDisplaySchema = z.object({
   headlineApyPct: z.number(),
   riskBadge: z.string(),
   liquidityBadge: z.string(),
-  status: z.enum(['depositable', 'not_depositable', 'not_simulatable', 'needs_review']),
+  status: z.enum(['market_data_only', 'tx_blueprint_known', 'simulation_supported', 'execution_supported', 'needs_review']),
   primaryWarnings: z.array(z.string()),
   availableFollowups: z.array(z.string())
+});
+
+export const opportunityCapabilitiesSchema = z.object({
+  marketData: z.boolean(),
+  riskData: z.boolean(),
+  depositTxKnown: z.boolean(),
+  simulationSupported: z.boolean(),
+  executionSupported: z.boolean()
 });
 
 export const savingsOpportunitySchema = z.object({
@@ -53,10 +67,9 @@ export const savingsOpportunitySchema = z.object({
     factors: z.array(z.string()),
     synthesis: z.string()
   }),
-  flags: z.object({
-    depositable: z.boolean(),
-    simulatable: z.boolean()
-  }),
+  capabilities: opportunityCapabilitiesSchema,
+  integrationStatus: integrationStatusSchema,
+  limitations: z.array(z.string()),
   refs: z.object({
     market: z.string().optional(),
     reserve: z.string().optional(),
@@ -156,7 +169,9 @@ export const compareOpportunitySchema = z.object({
   tvl: savingsOpportunitySchema.shape.tvl,
   liquidity: savingsOpportunitySchema.shape.liquidity,
   risk: savingsOpportunitySchema.shape.risk,
-  flags: savingsOpportunitySchema.shape.flags,
+  capabilities: opportunityCapabilitiesSchema,
+  integrationStatus: integrationStatusSchema,
+  limitations: z.array(z.string()),
   evidence: z.array(opportunityEvidenceSchema),
   display: opportunityDisplaySchema
 });
@@ -209,15 +224,336 @@ export const metricPacketSchema = z.object({
     symbol: z.string().optional(),
     exchangeRate: z.string().optional()
   }),
-  flags: z.object({
-    depositable: z.boolean(),
-    simulatable: z.boolean(),
+  capabilities: opportunityCapabilitiesSchema.extend({
     requiresKyc: z.boolean(),
     accessGated: z.boolean(),
     hasLpExposure: z.boolean(),
     usesExternalStrategies: z.boolean()
   }),
   evidence: z.array(opportunityEvidenceSchema)
+});
+
+export const opportunityLookupInputSchema = z.object({
+  opportunityId: z.string(),
+  refresh: z.boolean().optional()
+});
+
+export const getOpportunityOutputSchema = z.object({
+  asset: savingsAssetSchema,
+  generated_at: z.string(),
+  source: savingsCatalogueSchema.shape.source,
+  opportunity: savingsOpportunitySchema
+});
+
+export const screenOpportunitiesInputSchema = z.object({
+  refresh: z.boolean().optional(),
+  opportunityIds: z.array(z.string()).optional(),
+  venues: z.array(z.string()).optional(),
+  productTypes: z.array(productTypeSchema).optional(),
+  integrationStatuses: z.array(integrationStatusSchema).optional(),
+  minTvlUsd: z.number().optional(),
+  minApyPct: z.number().optional(),
+  maxRiskScore: z.number().optional(),
+  minWithdrawalBufferPct: z.number().optional()
+});
+
+export const screenedOpportunitySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  venue: z.string(),
+  productType: productTypeSchema,
+  apyPct: z.number(),
+  tvlUsd: z.number(),
+  riskTier: riskTierSchema,
+  riskScore: z.number(),
+  integrationStatus: integrationStatusSchema,
+  capabilities: opportunityCapabilitiesSchema,
+  limitations: z.array(z.string()),
+  display: opportunityDisplaySchema
+});
+
+export const screenOpportunitiesOutputSchema = z.object({
+  asset: savingsAssetSchema,
+  generated_at: z.string(),
+  criteria: screenOpportunitiesInputSchema.omit({ refresh: true }),
+  included: z.array(screenedOpportunitySchema),
+  excluded: z.array(
+    screenedOpportunitySchema.extend({
+      reasons: z.array(z.string())
+    })
+  )
+});
+
+export const rankOpportunitiesInputSchema = z.object({
+  refresh: z.boolean().optional(),
+  opportunityIds: z.array(z.string()).optional(),
+  rankBy: z.enum(['risk_adjusted_apy', 'apy', 'tvl', 'risk', 'liquidity']).optional()
+});
+
+export const rankOpportunitiesOutputSchema = z.object({
+  asset: savingsAssetSchema,
+  generated_at: z.string(),
+  rankBy: z.enum(['risk_adjusted_apy', 'apy', 'tvl', 'risk', 'liquidity']),
+  ranked: z.array(
+    screenedOpportunitySchema.extend({
+      rank: z.number(),
+      rankScore: z.number()
+    })
+  )
+});
+
+export const allocationInputWeightSchema = z.object({
+  opportunityId: z.string(),
+  weightPct: z.number()
+});
+
+export const allocationWeightsInputSchema = z.object({
+  refresh: z.boolean().optional(),
+  amountUsd: z.number().optional(),
+  weights: z.array(allocationInputWeightSchema)
+});
+
+export const allocationValidationOutputSchema = z.object({
+  status: z.enum(['ok', 'warning', 'blocked']),
+  totalWeightPct: z.number(),
+  amountUsd: z.number().nullable(),
+  warnings: z.array(z.string()),
+  errors: z.array(z.string()),
+  missingOpportunityIds: z.array(z.string()),
+  duplicateOpportunityIds: z.array(z.string())
+});
+
+export const blendedApyOutputSchema = z.object({
+  blendedApyPct: z.number(),
+  weights: z.array(allocationInputWeightSchema),
+  components: z.array(
+    z.object({
+      opportunityId: z.string(),
+      title: z.string(),
+      venue: z.string(),
+      weightPct: z.number(),
+      apyPct: z.number(),
+      contributionPct: z.number()
+    })
+  ),
+  generated_at: z.string()
+});
+
+export const blendedRiskOutputSchema = z.object({
+  blendedRiskScore: z.number(),
+  riskEnvelope: z.string(),
+  weights: z.array(allocationInputWeightSchema),
+  components: z.array(
+    z.object({
+      opportunityId: z.string(),
+      title: z.string(),
+      venue: z.string(),
+      weightPct: z.number(),
+      riskScore: z.number(),
+      riskTier: riskTierSchema,
+      contribution: z.number()
+    })
+  ),
+  generated_at: z.string()
+});
+
+export const concentrationOutputSchema = z.object({
+  totalWeightPct: z.number(),
+  maxVenueWeightPct: z.number(),
+  maxProductTypeWeightPct: z.number(),
+  maxOpportunityWeightPct: z.number(),
+  byVenue: z.array(z.object({ venue: z.string(), weightPct: z.number() })),
+  byProductType: z.array(z.object({ productType: productTypeSchema, weightPct: z.number() })),
+  byIntegrationStatus: z.array(z.object({ integrationStatus: integrationStatusSchema, weightPct: z.number() })),
+  byOpportunity: z.array(z.object({ opportunityId: z.string(), title: z.string(), venue: z.string(), weightPct: z.number() })),
+  generated_at: z.string()
+});
+
+export const rebalanceDeltaInputSchema = z.object({
+  refresh: z.boolean().optional(),
+  amountUsd: z.number().optional(),
+  currentWeights: z.array(allocationInputWeightSchema),
+  targetWeights: z.array(allocationInputWeightSchema)
+});
+
+export const rebalanceDeltaOutputSchema = z.object({
+  amountUsd: z.number().nullable(),
+  totalCurrentWeightPct: z.number(),
+  totalTargetWeightPct: z.number(),
+  deltas: z.array(
+    z.object({
+      opportunityId: z.string(),
+      title: z.string().nullable(),
+      venue: z.string().nullable(),
+      currentWeightPct: z.number(),
+      targetWeightPct: z.number(),
+      deltaWeightPct: z.number(),
+      currentAmountUsd: z.number().nullable(),
+      targetAmountUsd: z.number().nullable(),
+      deltaAmountUsd: z.number().nullable()
+    })
+  ),
+  generated_at: z.string()
+});
+
+export const historySampleSchema = z
+  .object({
+    opportunityId: z.string(),
+    timestamp: z.string(),
+    apy: z.number().optional(),
+    tvlUsd: z.number().optional(),
+    utilizationPct: z.number().nullable().optional(),
+    withdrawalBufferPct: z.number().nullable().optional(),
+    source: z.string().optional()
+  })
+  .passthrough();
+
+export const opportunityHistorySeriesSchema = z.object({
+  opportunityId: z.string().optional(),
+  samples: z.array(historySampleSchema)
+});
+
+export const opportunityHistorySummarySchema = z.object({
+  opportunityId: z.string(),
+  sampleCount: z.number(),
+  windowDays: z.number(),
+  apyMean: z.number(),
+  apyStdDev: z.number(),
+  apyMin: z.number(),
+  apyMax: z.number(),
+  apyP10: z.number().optional(),
+  apyP50: z.number().optional(),
+  apyP90: z.number().optional(),
+  tvlMeanUsd: z.number().optional(),
+  utilizationMeanPct: z.number().nullable().optional(),
+  withdrawalBufferMinPct: z.number().nullable().optional(),
+  source: z.string().optional()
+});
+
+export const historyAnalyticsInputSchema = z.object({
+  samples: z.array(historySampleSchema).optional(),
+  series: opportunityHistorySeriesSchema.optional(),
+  summary: opportunityHistorySummarySchema.optional()
+});
+
+export const historyComparisonInputSchema = z.object({
+  histories: z.array(historyAnalyticsInputSchema)
+});
+
+export const historySampleSchemaOutputSchema = z.object({
+  sample: z.object({
+    type: z.literal('object'),
+    required: z.array(z.string()),
+    properties: z.record(z.string(), z.unknown())
+  }),
+  summary: z.object({
+    type: z.literal('object'),
+    required: z.array(z.string()),
+    properties: z.record(z.string(), z.unknown())
+  })
+});
+
+export const historyValidationOutputSchema = z.object({
+  status: z.enum(['ok', 'warning', 'blocked']),
+  mode: z.enum(['samples', 'summary', 'empty']),
+  sampleCount: z.number(),
+  opportunityIds: z.array(z.string()),
+  warnings: z.array(z.string()),
+  errors: z.array(z.string())
+});
+
+export const historyQualityOutputSchema = z.object({
+  mode: z.enum(['samples', 'summary']),
+  opportunityId: z.string(),
+  coverage: z.object({
+    sampleCount: z.number(),
+    startTimestamp: z.string().nullable(),
+    endTimestamp: z.string().nullable(),
+    windowDays: z.number()
+  }),
+  completeness: z.object({
+    apySamples: z.number(),
+    tvlSamples: z.number(),
+    utilizationSamples: z.number(),
+    withdrawalBufferSamples: z.number()
+  }),
+  warnings: z.array(z.string()),
+  qualityScore: z.number()
+});
+
+export const rateStabilityOutputSchema = z.object({
+  mode: z.enum(['samples', 'summary']),
+  opportunityId: z.string(),
+  sampleCount: z.number(),
+  windowDays: z.number(),
+  meanApy: z.number(),
+  stdDevApy: z.number(),
+  minApy: z.number(),
+  maxApy: z.number(),
+  p10Apy: z.number(),
+  p50Apy: z.number(),
+  p90Apy: z.number(),
+  coefficientOfVariation: z.number(),
+  regime: z.enum(['stable', 'variable', 'volatile']),
+  stabilityScore: z.number()
+});
+
+export const yieldPercentilesOutputSchema = z.object({
+  mode: z.enum(['samples', 'summary']),
+  opportunityId: z.string(),
+  sampleCount: z.number(),
+  p10Apy: z.number(),
+  p25Apy: z.number(),
+  p50Apy: z.number(),
+  p75Apy: z.number(),
+  p90Apy: z.number(),
+  minApy: z.number(),
+  maxApy: z.number()
+});
+
+export const historicalLiquidityRiskOutputSchema = z.object({
+  mode: z.enum(['samples', 'summary']),
+  opportunityId: z.string(),
+  sampleCount: z.number(),
+  riskLevel: riskLevelSchema,
+  utilization: z.object({
+    meanPct: z.number().nullable(),
+    maxPct: z.number().nullable()
+  }),
+  withdrawalBuffer: z.object({
+    minPct: z.number().nullable(),
+    meanPct: z.number().nullable()
+  }),
+  warnings: z.array(z.string())
+});
+
+export const historyAnomalyOutputSchema = z.object({
+  opportunityId: z.string(),
+  anomalies: z.array(
+    z.object({
+      type: z.enum(['apy_spike', 'apy_drop', 'tvl_drop', 'withdrawal_buffer_drop', 'utilization_spike']),
+      timestamp: z.string(),
+      previousTimestamp: z.string().nullable(),
+      severity: riskLevelSchema,
+      details: z.string()
+    })
+  )
+});
+
+export const historicalComparisonOutputSchema = z.object({
+  comparison: z.array(
+    z.object({
+      opportunityId: z.string(),
+      sampleCount: z.number(),
+      regime: z.enum(['stable', 'variable', 'volatile']),
+      meanApy: z.number(),
+      p50Apy: z.number(),
+      p90Apy: z.number(),
+      liquidityRiskLevel: riskLevelSchema,
+      anomalyCount: z.number(),
+      stabilityScore: z.number()
+    })
+  )
 });
 
 export const dataQualityInputSchema = z.object({
@@ -271,12 +607,12 @@ export const capacityUtilizationAnalysisSchema = z.object({
   summary: z.string(),
   tvlUsd: z.number(),
   utilizationPct: z.number().nullable(),
-  depositable: z.boolean(),
-  simulatable: z.boolean(),
+  depositTxKnown: z.boolean(),
+  simulationSupported: z.boolean(),
   capacitySignals: z.object({
     thinVenue: z.boolean(),
     highUtilization: z.boolean(),
-    cappedOrUnavailable: z.boolean(),
+    connectorLimited: z.boolean(),
     fragmentedLiquidity: z.boolean()
   }),
   warnings: z.array(z.string()),
@@ -293,6 +629,15 @@ export const strategyExposureAnalysisSchema = z.object({
   routingNotes: z.array(z.string()),
   warnings: z.array(z.string()),
   evidence: z.array(opportunityEvidenceSchema)
+});
+
+export const currentOpportunityAnalyticsOutputSchema = z.object({
+  opportunity: savingsOpportunitySchema,
+  metricPacket: metricPacketSchema,
+  rateMetrics: rateQualityAnalysisSchema,
+  liquidityMetrics: exitLiquidityAnalysisSchema,
+  capacityMetrics: capacityUtilizationAnalysisSchema,
+  strategyExposure: strategyExposureAnalysisSchema
 });
 
 export const venueRiskDecompositionSchema = z.object({
@@ -389,6 +734,7 @@ export const allocationWorkflowOutputSchema = z.object({
 });
 
 export type MetricPacket = z.infer<typeof metricPacketSchema>;
+export type OpportunityCapabilities = z.infer<typeof opportunityCapabilitiesSchema>;
 export type DataQualityReport = z.infer<typeof dataQualityReportSchema>;
 export type AllocationOutput = z.infer<typeof allocationOutputSchema>;
 export type CompareOpportunitiesOutput = z.infer<typeof compareOpportunitiesOutputSchema>;
@@ -402,3 +748,10 @@ export type AnalyzeSavingsAllocationInput = z.infer<typeof analyzeSavingsAllocat
 export type EligibilityReport = z.infer<typeof eligibilityReportSchema>;
 export type OpportunityAnalysis = z.infer<typeof opportunityAnalysisSchema>;
 export type AnalyzeSavingsAllocationOutput = z.infer<typeof analyzeSavingsAllocationOutputSchema>;
+export type AllocationInputWeight = z.infer<typeof allocationInputWeightSchema>;
+export type HistoricalLiquidityRisk = z.infer<typeof historicalLiquidityRiskOutputSchema>;
+export type HistoryAnalyticsInput = z.infer<typeof historyAnalyticsInputSchema>;
+export type HistoryComparisonInput = z.infer<typeof historyComparisonInputSchema>;
+export type HistorySample = z.infer<typeof historySampleSchema>;
+export type OpportunityHistorySummary = z.infer<typeof opportunityHistorySummarySchema>;
+export type RateStability = z.infer<typeof rateStabilityOutputSchema>;

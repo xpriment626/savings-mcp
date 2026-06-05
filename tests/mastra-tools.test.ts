@@ -87,4 +87,44 @@ describe('Savings Mastra tools', () => {
     assert.equal(result.warnings.some((warning) => warning.includes('fixture')), true);
     assert.equal(result.opportunityReports.length, 5);
   });
+
+  it('exposes composable current-snapshot analytics tools', async () => {
+    const tools = createSavingsMastraTools(fixtureConfig);
+
+    const screened = parseResult<{ included: Array<{ id: string; integrationStatus: string }> }>(
+      await tools.screenOpportunitiesTool.execute?.({ integrationStatuses: ['market_data_only'] }, toolContext)
+    );
+    const blended = parseResult<{ blendedApyPct: number }>(
+      await tools.calculateBlendedApyTool.execute?.(
+        {
+          weights: [
+            { opportunityId: 'kamino:lend:main-usdc', weightPct: 50 },
+            { opportunityId: 'jupiter:earn:usdc', weightPct: 50 }
+          ]
+        },
+        toolContext
+      )
+    );
+
+    assert.equal(screened.included.every((entry) => entry.integrationStatus === 'market_data_only'), true);
+    assert.equal(screened.included.some((entry) => entry.id === 'jupiter:earn:usdc'), true);
+    assert.equal(Number.isFinite(blended.blendedApyPct), true);
+  });
+
+  it('exposes stateless historical analytics tools', async () => {
+    const tools = createSavingsMastraTools(fixtureConfig);
+    const samples = [
+      { opportunityId: 'kamino:lend:main-usdc', timestamp: '2026-06-01T00:00:00.000Z', apy: 0.04, tvlUsd: 160_000_000 },
+      { opportunityId: 'kamino:lend:main-usdc', timestamp: '2026-06-02T00:00:00.000Z', apy: 0.041, tvlUsd: 162_000_000 },
+      { opportunityId: 'kamino:lend:main-usdc', timestamp: '2026-06-03T00:00:00.000Z', apy: 0.039, tvlUsd: 161_000_000 }
+    ];
+
+    const stability = parseResult<{ mode: string; regime: string; sampleCount: number }>(
+      await tools.calculateRateStabilityTool.execute?.({ samples }, toolContext)
+    );
+
+    assert.equal(stability.mode, 'samples');
+    assert.equal(stability.regime, 'stable');
+    assert.equal(stability.sampleCount, 3);
+  });
 });
