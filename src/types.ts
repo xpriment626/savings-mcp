@@ -25,6 +25,8 @@ export interface AppConfig {
   host: string;
   port: number;
   kaminoApiBaseUrl: string;
+  jupiterLendApiBaseUrl: string;
+  saveSolendApiBaseUrl: string;
   requestTimeoutMs: number;
   cacheTtlMs: number;
   useFixtureCatalogue: boolean;

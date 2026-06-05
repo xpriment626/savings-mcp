@@ -85,6 +85,6 @@ describe('Savings Mastra tools', () => {
 
     assert.equal(result.mode, 'fixture');
     assert.equal(result.warnings.some((warning) => warning.includes('fixture')), true);
-    assert.equal(result.opportunityReports.length, 3);
+    assert.equal(result.opportunityReports.length, 5);
   });
 });

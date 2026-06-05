@@ -76,7 +76,19 @@ export const savingsCatalogueSchema = z.object({
     mode: z.enum(['fixture', 'live']),
     baseUrl: z.string().optional()
   }),
-  opportunities: z.array(savingsOpportunitySchema)
+  opportunities: z.array(savingsOpportunitySchema),
+  warnings: z.array(z.string()).optional(),
+  venueReports: z
+    .array(
+      z.object({
+        adapterId: z.string(),
+        venue: z.string(),
+        status: z.enum(['ok', 'warning', 'unavailable']),
+        opportunityCount: z.number(),
+        warnings: z.array(z.string())
+      })
+    )
+    .optional()
 });
 
 export const searchUsdcOpportunitiesInputSchema = z.object({

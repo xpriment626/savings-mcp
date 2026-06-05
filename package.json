@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:raw": "tsx --test tests/savings-mcp.test.ts",
+    "test:live": "tsx --test tests/live-venues.test.ts",
     "test:mastra-workflow": "tsx --test tests/mastra-workflow.test.ts"
   },
   "devDependencies": {

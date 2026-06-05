@@ -95,6 +95,8 @@ describe('Savings MCP raw HTTP endpoint', () => {
     const payload = structuredContent<{
       asset?: { mint?: string };
       opportunities?: Array<{
+        id?: string;
+        venue?: string;
         asset?: { symbol?: string };
         apy?: { current?: unknown };
         display?: {
@@ -120,13 +122,19 @@ describe('Savings MCP raw HTTP endpoint', () => {
       payload.opportunities?.every((opp) => opp.display?.availableFollowups?.every((toolName) => exposedToolNames.has(toolName))),
       true
     );
+    assert.deepEqual(
+      new Set(payload.opportunities?.map((opp) => opp.venue)),
+      new Set(['Kamino', 'Jupiter Lend', 'Save/Solend'])
+    );
+    assert.equal(payload.opportunities?.some((opp) => opp.id === 'jupiter:earn:usdc'), true);
+    assert.equal(payload.opportunities?.some((opp) => opp.id === 'save:lend:main-usdc'), true);
     assert.equal((payload.opportunities?.length ?? 0) >= 2, true);
   });
 
   it('returns structured comparison payloads with display summaries', async () => {
     const body = await rpc('tools/call', {
       name: 'compare_opportunities',
-      arguments: { opportunityIds: ['kamino:lend:main-usdc', 'kamino:earn:usdc-core'] }
+      arguments: { opportunityIds: ['kamino:lend:main-usdc', 'jupiter:earn:usdc', 'save:lend:main-usdc'] }
     });
 
     assert.deepEqual(body.error, undefined);
@@ -140,7 +148,7 @@ describe('Savings MCP raw HTTP endpoint', () => {
 
     assert.deepEqual(
       payload.comparison?.map((item) => item.id),
-      ['kamino:lend:main-usdc', 'kamino:earn:usdc-core']
+      ['kamino:lend:main-usdc', 'jupiter:earn:usdc', 'save:lend:main-usdc']
     );
     assert.equal(payload.comparison?.every((item) => typeof item.display?.status === 'string'), true);
     assert.equal(payload.comparison?.every((item) => Array.isArray(item.display?.primaryWarnings)), true);
@@ -150,7 +158,7 @@ describe('Savings MCP raw HTTP endpoint', () => {
     const body = await rpc('tools/call', {
       name: 'propose_allocation',
       arguments: {
-        opportunityIds: ['kamino:lend:main-usdc', 'kamino:earn:usdc-core'],
+        opportunityIds: ['kamino:lend:main-usdc', 'jupiter:earn:usdc', 'save:lend:main-usdc'],
         amountUsd: 10_000,
         riskPreference: 'balanced'
       }
@@ -167,14 +175,18 @@ describe('Savings MCP raw HTTP endpoint', () => {
         availableFollowups?: string[];
       };
       allocation?: {
-        weights?: Array<{ weightPct: number }>;
+        weights?: Array<{ opportunityId: string; weightPct: number }>;
         rationale?: string;
       };
     }>(body);
     const weights = payload.allocation?.weights ?? [];
     const totalWeight = weights.reduce((sum, weight) => sum + weight.weightPct, 0);
 
-    assert.equal(weights.length, 2);
+    assert.equal(weights.length, 3);
+    assert.deepEqual(
+      new Set(weights.map((weight) => weight.opportunityId)),
+      new Set(['kamino:lend:main-usdc', 'jupiter:earn:usdc', 'save:lend:main-usdc'])
+    );
     assert.equal(Math.round(totalWeight), 100);
     assert.equal(payload.allocation?.rationale?.includes('deterministic'), true);
     assert.equal(payload.display?.displayTitle, '$10,000 USDC allocation preview');

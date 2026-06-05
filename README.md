@@ -1,11 +1,11 @@
 # Savings MCP
 
-Agent-native USDC savings surface for Solana. The v0 server exposes a raw JSON-RPC MCP endpoint with Kamino-backed canonical USDC opportunity discovery, comparison, and deterministic allocation previews.
+Agent-native USDC savings surface for Solana. The v0 server exposes a raw JSON-RPC MCP endpoint with canonical Solana USDC opportunity discovery, comparison, and deterministic allocation previews across supported venues.
 
 The current scope is read-only:
 
 - canonical Solana USDC only: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`
-- Kamino is the first venue
+- supported venues: Kamino, Jupiter Lend, Save/Solend
 - allocation weights are deterministic library math
 - execution, signing, and deposit simulation are not wired yet
 
@@ -40,6 +40,8 @@ Folder map:
 - `src/core/tool-args.ts`: shared zod-backed argument parsing for raw MCP and Mastra tools.
 - `src/venues/types.ts`: venue adapter contract for normalized USDC savings venues.
 - `src/venues/kamino.ts`: Kamino adapter implementation for fixture/live USDC catalogue data.
+- `src/venues/jupiter-lend.ts`: Jupiter Lend adapter implementation for fixture/live USDC Earn data.
+- `src/venues/save-solend.ts`: Save/Solend adapter implementation for fixture/live USDC reserve data.
 - `src/mastra/tools/index.ts`: thin Mastra tool wrappers around deterministic library functions.
 - `src/mastra/agents/metric-specialists.ts`: structured-output Mastra metric specialist definitions over normalized payloads.
 - `src/mastra/schemas/savings.ts`: compatibility re-export for the canonical core schemas.
@@ -112,10 +114,19 @@ http://127.0.0.1:8788/mcp
 Run deterministic raw endpoint and Mastra workflow tests without leaving a server running:
 
 ```bash
+npm run typecheck
 npm test
 npm run test:raw
 npm run test:mastra-workflow
 ```
+
+Run live venue checks explicitly:
+
+```bash
+RUN_LIVE_VENUE_TESTS=1 npm run test:live
+```
+
+Without `RUN_LIVE_VENUE_TESTS=1`, `npm run test:live` skips clearly instead of hitting public venue APIs.
 
 Internal one-off request scripts can live under ignored `scripts/`, but committed `package.json` commands only point at tracked contributor-runnable tests.
 
@@ -123,6 +134,12 @@ For fixture-mode local calls:
 
 ```bash
 SAVINGS_USE_FIXTURE_CATALOGUE=1 npm run dev
+```
+
+For live local calls:
+
+```bash
+npm run dev
 ```
 
 ## ChatGPT/Codex Dev-Mode MCP Smoke
@@ -156,14 +173,21 @@ Expected behavior:
 - The chat agent discovers `get_usdc_opportunities`, `compare_opportunities`, and `propose_allocation`.
 - The agent reasons from `structuredContent`, not by parsing JSON text from `content`.
 - Opportunity responses include stable IDs, source/provenance, APY, TVL, liquidity, risk, flags, evidence, and `display` summaries.
+- Fixture responses include Kamino, Jupiter Lend, and Save/Solend USDC opportunities.
+- Live responses include per-venue `venueReports`; a temporarily unavailable venue is surfaced as a report/warning instead of crashing the whole catalogue.
 - Allocation responses are explicitly preview-only and keep auth/signing/transaction/ledger responsibilities outside Savings MCP.
 - Any warnings about depositability, simulation, managed vault exposure, or high utilization stay visible to the model.
+
+Known live-data limitations:
+
+- Jupiter Lend USDC Earn is normalized as a `vault`-style opportunity because it exposes jlUSDC receipt-token and debt-ceiling withdrawal mechanics, not a reserve-style utilization model. Utilization is `null`; withdrawal buffer reflects currently withdrawable assets when available.
+- Save/Solend uses public market config and reserve detail endpoints for catalogue data. User obligation state is intentionally not read, so the adapter does not infer whether a user deposit is serving as collateral for liabilities.
 
 ## Env Pass From Fabrick
 
 Needed now:
 
-- `KAMINO_API_BASE_URL`, `KAMINO_REQUEST_TIMEOUT_MS`, `SAVINGS_CACHE_TTL_MS` are public catalogue knobs. Defaults work without secrets.
+- `KAMINO_API_BASE_URL`, `JUPITER_LEND_API_BASE_URL`, `SAVE_SOLEND_API_BASE_URL`, `KAMINO_REQUEST_TIMEOUT_MS`, and `SAVINGS_CACHE_TTL_MS` are public catalogue knobs. Defaults work without secrets.
 
 Needed when simulation / transaction prep is wired:
 

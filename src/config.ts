@@ -21,6 +21,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     host: env.HOST ?? '127.0.0.1',
     port: parseInteger(env.PORT, DEFAULT_PORT),
     kaminoApiBaseUrl: env.KAMINO_API_BASE_URL ?? 'https://api.kamino.finance',
+    jupiterLendApiBaseUrl: env.JUPITER_LEND_API_BASE_URL ?? 'https://lite-api.jup.ag/lend/v1',
+    saveSolendApiBaseUrl: env.SAVE_SOLEND_API_BASE_URL ?? 'https://api.save.finance/v1',
     requestTimeoutMs: parseInteger(env.KAMINO_REQUEST_TIMEOUT_MS, 10_000),
     cacheTtlMs: parseInteger(env.SAVINGS_CACHE_TTL_MS, 10 * 60 * 1000),
     useFixtureCatalogue: parseBoolean(env.SAVINGS_USE_FIXTURE_CATALOGUE, false),
