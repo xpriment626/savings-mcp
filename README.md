@@ -56,7 +56,7 @@ This repo owns:
 - venue adapters and normalized USDC opportunity data
 - deterministic comparison, scoring, and allocation helpers
 - schema-checked payloads for metrics, analysis, and allocation previews
-- MCP tools and Mastra tools that expose those deterministic helpers
+- raw MCP tools that expose those deterministic helpers
 
 Integrating applications own:
 
@@ -65,99 +65,23 @@ Integrating applications own:
 - ledgers, balances, account histories, and UI state
 - fee policy and production routing orchestration
 
-## Mastra Layer
-
-Mastra is wired as a parallel agent/workflow layer over the deterministic savings library.
-
-Folder map:
+## Project Layout
 
 - `src/core/schemas.ts`: canonical zod schemas for opportunities, metric packets, data quality, allocation inputs/outputs, and workflow payloads.
 - `src/core/display.ts`: deterministic display summaries for chat agents and lightweight app renderers.
 - `src/core/capabilities.ts`: connector capability/status helpers that separate market data from app-side transaction support.
 - `src/core/metrics.ts`: deterministic metric packet, data-quality, and allocation-readiness helpers.
 - `src/core/analysis.ts`: deterministic specialist analysis and narration helpers.
-- `src/core/tool-args.ts`: shared zod-backed argument parsing for raw MCP and Mastra tools.
+- `src/core/tool-args.ts`: shared zod-backed argument parsing for raw MCP tools.
 - `src/current-analytics.ts`: deterministic current-snapshot opportunity, metric, screen, rank, allocation, concentration, and rebalance helpers.
 - `src/history-analytics.ts`: stateless BYOD historical validation, stability, percentile, liquidity-risk, anomaly, and comparison helpers.
 - `src/venues/types.ts`: venue adapter contract for normalized USDC savings venues.
 - `src/venues/kamino.ts`: Kamino adapter implementation for fixture/live USDC catalogue data.
 - `src/venues/jupiter-lend.ts`: Jupiter Lend adapter implementation for fixture/live USDC Earn data.
 - `src/venues/save-solend.ts`: Save/Solend adapter implementation for fixture/live USDC reserve data.
-- `src/mastra/tools/index.ts`: thin Mastra tool wrappers around deterministic library functions.
-- `src/mastra/agents/metric-specialists.ts`: structured-output Mastra metric specialist definitions over normalized payloads.
-- `src/mastra/schemas/savings.ts`: compatibility re-export for the canonical core schemas.
-- `src/mastra/workflows/analyze-savings-allocation.ts`: `analyzeSavingsAllocationWorkflow` and deterministic app/script runner.
-- `src/mastra/mcp-server.ts`: parallel Mastra `MCPServer` exposing tools and workflow.
-- `src/mastra/index.ts`: public exports for the Mastra surface.
-
-Current tools:
-
-- `searchUsdcOpportunitiesTool`
-- `compareOpportunitiesTool`
-- `proposeAllocationTool`
-- `getMetricPacketTool`
-- `analyzeDataQualityTool`
-- `getOpportunityTool`
-- `calculateOpportunityAnalyticsTool`
-- `calculateRateMetricsTool`
-- `calculateLiquidityMetricsTool`
-- `calculateCapacityMetricsTool`
-- `calculateStrategyExposureTool`
-- `screenOpportunitiesTool`
-- `rankOpportunitiesTool`
-- `calculateBlendedApyTool`
-- `calculateBlendedRiskTool`
-- `calculateConcentrationTool`
-- `calculateRebalanceDeltaTool`
-- `validateAllocationInputsTool`
-- `getHistorySampleSchemaTool`
-- `validateHistorySamplesTool`
-- `summarizeHistoryQualityTool`
-- `calculateRateStabilityTool`
-- `calculateYieldPercentilesTool`
-- `calculateHistoricalLiquidityRiskTool`
-- `detectHistoryAnomaliesTool`
-- `compareHistoricalOpportunitiesTool`
-
-The Mastra layer does not add auth, wallet signing, account persistence, transaction sending, or user ledgers.
-
-### Metric Specialist Agents
-
-The first specialist agents consume `metricPacketSchema`, allocation outputs, and other normalized Savings MCP payloads only.
-
-- `RateQualityAgent`: APY source/window, base versus rewards, stability confidence, and missing history.
-- `ExitLiquidityAgent`: withdrawal mode, utilization, buffers, debt-ceiling notes, LP exit notes, and exit risk level.
-- `CapacityUtilizationAgent`: TVL, utilization, connector capability limits, and thin or fragmented venue warnings.
-- `StrategyExposureAgent`: managed vaults, external strategy routing, Kamino Earn/Meteora notes, and LP exposure flags.
-- `VenueRiskDecomposerAgent`: specialist-output synthesis into comparable venue/product risk.
-- `StrategyNarratorAgent`: narration for fixed deterministic allocations; it never changes weights.
-
-Each agent exports a zod `outputSchema`. Fixture-mode tests use a stable deterministic harness so no live model call is required.
-
-### Allocation Analysis Workflow
-
-`analyzeSavingsAllocationWorkflow` remains available as a parallel compatibility workflow that composes the Savings MCP tools and metric specialists into one portable payload for integrating apps. The primary infra contract is now the composable raw/Mastra tool surface above.
-
-Input:
-
-- `opportunityIds`
-- `amountUsd`
-- `riskPreference`
-- `nudges?`
-- `refresh?`
-
-Output:
-
-- selected opportunities
-- deterministic data-quality and allocation-readiness reports
-- deterministic allocation
-- metric packets
-- specialist analyses
-- comparable venue risk decomposition
-- fixed-weight strategy narration
-- explicit external-integrator boundaries for auth, signing, transaction sending, and user ledgers
-
-The parallel Mastra MCP surface is available from `createSavingsMastraMcpServer(...)`; it exposes the Mastra tools plus `run_analyzeSavingsAllocationWorkflow`.
+- `src/mcp.ts`: raw JSON-RPC MCP method/tool/resource handling.
+- `src/server.ts`: local HTTP server entrypoint.
+- `examples/mastra-consumer`: optional Mastra consumer example that wraps the same deterministic tools.
 
 ## Run
 
@@ -173,13 +97,18 @@ http://127.0.0.1:8788/mcp
 
 ## Contributor Tests
 
-Run deterministic raw endpoint and Mastra workflow tests without leaving a server running:
+Run deterministic core checks without leaving a server running:
 
 ```bash
 npm run typecheck
 npm test
 npm run test:raw
-npm run test:mastra-workflow
+```
+
+Run examples separately:
+
+```bash
+npm run test:examples
 ```
 
 Run live venue checks explicitly:

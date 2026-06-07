@@ -8,7 +8,7 @@ interface PackageJson {
 }
 
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as PackageJson;
-const localTypescriptTargetPattern = /\b(?:src|tests|scripts)\/[^\s'"]+\.ts\b/g;
+const localTypescriptTargetPattern = /\b(?:src|tests|examples|scripts)\/[^\s'"]+\.ts\b/g;
 
 function trackedPathspecMatches(pathspec: string): string[] {
   return execFileSync('git', ['ls-files', '--', pathspec], { encoding: 'utf8' })

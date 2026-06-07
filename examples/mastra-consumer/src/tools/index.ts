@@ -1,7 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 
-import { compareOpportunities, proposeAllocation } from '../../allocation.js';
-import { getFilteredOpportunities, getUsdcCatalogue } from '../../catalogue.js';
+import { compareOpportunities, proposeAllocation } from '../../../../src/allocation.js';
+import { getFilteredOpportunities, getUsdcCatalogue } from '../../../../src/catalogue.js';
 import {
   calculateBlendedApy,
   calculateBlendedRisk,
@@ -17,7 +17,7 @@ import {
   rankOpportunities,
   screenOpportunities,
   validateAllocationInputs
-} from '../../current-analytics.js';
+} from '../../../../src/current-analytics.js';
 import {
   calculateHistoricalLiquidityRisk,
   calculateRateStability,
@@ -27,15 +27,15 @@ import {
   getHistorySampleSchema,
   summarizeHistoryQuality,
   validateHistorySamples
-} from '../../history-analytics.js';
-import { buildDataQualityReport, buildMetricPacket } from '../../core/metrics.js';
+} from '../../../../src/history-analytics.js';
+import { buildDataQualityReport, buildMetricPacket } from '../../../../src/core/metrics.js';
 import {
   parseCompareOpportunitiesArgs,
   parseFilterOpportunitiesArgs,
   parseProposeAllocationArgs
-} from '../../core/tool-args.js';
-import { loadConfig } from '../../config.js';
-import type { AppConfig } from '../../types.js';
+} from '../../../../src/core/tool-args.js';
+import { loadConfig } from '../../../../src/config.js';
+import type { AppConfig } from '../../../../src/types.js';
 import {
   allocationOutputSchema,
   allocationValidationOutputSchema,

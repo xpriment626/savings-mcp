@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { createSavingsMastraMcpServer, createSavingsMastraMcpSurface } from '../src/mastra/mcp-server.js';
+import { createSavingsMastraMcpServer, createSavingsMastraMcpSurface } from './src/mcp-server.js';
 import {
   analyzeSavingsAllocationOutputSchema,
   analyzeSavingsAllocationWorkflowInputSchema
-} from '../src/mastra/schemas/savings.js';
+} from './src/schemas/savings.js';
 import {
   analyzeSavingsAllocationWorkflow,
   createAnalyzeSavingsAllocationWorkflow,
   runAnalyzeSavingsAllocation
-} from '../src/mastra/workflows/analyze-savings-allocation.js';
+} from './src/workflows/analyze-savings-allocation.js';
 
 const fixtureConfig = {
   useFixtureCatalogue: true,

@@ -11,18 +11,19 @@
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
+    "test:examples": "tsx --test examples/**/*.test.ts",
     "test:raw": "tsx --test tests/savings-mcp.test.ts",
     "test:live": "tsx --test tests/live-venues.test.ts",
-    "test:mastra-workflow": "tsx --test tests/mastra-workflow.test.ts"
+    "test:mastra-workflow": "tsx --test examples/mastra-consumer/mastra-workflow.test.ts"
   },
   "devDependencies": {
+    "@mastra/core": "^1.38.0",
+    "@mastra/mcp": "^1.9.0",
     "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@mastra/core": "^1.38.0",
-    "@mastra/mcp": "^1.9.0",
     "zod": "^4.4.3"
   }
 }

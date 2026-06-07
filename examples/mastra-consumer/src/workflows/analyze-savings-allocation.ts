@@ -1,9 +1,9 @@
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 
-import { buildOpportunityAnalysis, narrateDeterministicAllocation, uniqueOpportunityAnalysisEvidence } from '../../core/analysis.js';
-import { buildEligibilityReport, buildMetricPacket, orderedSelectedOpportunities } from '../../core/metrics.js';
-import { loadConfig } from '../../config.js';
-import type { AppConfig } from '../../types.js';
+import { buildOpportunityAnalysis, narrateDeterministicAllocation, uniqueOpportunityAnalysisEvidence } from '../../../../src/core/analysis.js';
+import { buildEligibilityReport, buildMetricPacket, orderedSelectedOpportunities } from '../../../../src/core/metrics.js';
+import { loadConfig } from '../../../../src/config.js';
+import type { AppConfig } from '../../../../src/types.js';
 import {
   allocationOutputSchema,
   analyzeSavingsAllocationOutputSchema,

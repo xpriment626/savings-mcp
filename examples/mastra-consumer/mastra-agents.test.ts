@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { proposeAllocation } from '../src/allocation.js';
-import { loadConfig } from '../src/config.js';
-import { fixtureCatalogue } from '../src/fixtures.js';
+import { proposeAllocation } from '../../src/allocation.js';
+import { loadConfig } from '../../src/config.js';
+import { fixtureCatalogue } from '../../src/fixtures.js';
 import {
   analyzeCapacityUtilization,
   analyzeExitLiquidity,
@@ -12,7 +12,7 @@ import {
   decomposeVenueRisk,
   metricSpecialistAgents,
   narrateDeterministicAllocation
-} from '../src/mastra/agents/metric-specialists.js';
+} from './src/agents/metric-specialists.js';
 import {
   capacityUtilizationAnalysisSchema,
   exitLiquidityAnalysisSchema,
@@ -20,8 +20,8 @@ import {
   strategyExposureAnalysisSchema,
   strategyNarrationSchema,
   venueRiskDecompositionSchema
-} from '../src/mastra/schemas/savings.js';
-import { buildMetricPacket } from '../src/mastra/tools/index.js';
+} from './src/schemas/savings.js';
+import { buildMetricPacket } from './src/tools/index.js';
 
 const generatedAt = '2026-06-03T00:00:00.000Z';
 const catalogue = fixtureCatalogue(generatedAt);

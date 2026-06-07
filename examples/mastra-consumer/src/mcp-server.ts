@@ -1,6 +1,6 @@
 import { MCPServer } from '@mastra/mcp';
 
-import type { AppConfig } from '../types.js';
+import type { AppConfig } from '../../../src/types.js';
 import { createSavingsMastraTools } from './tools/index.js';
 import { createAnalyzeSavingsAllocationWorkflow } from './workflows/analyze-savings-allocation.js';
 

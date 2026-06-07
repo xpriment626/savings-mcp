@@ -105,4 +105,4 @@ export {
   decomposeVenueRisk,
   narrateDeterministicAllocation,
   uniqueOpportunityAnalysisEvidence
-} from '../../core/analysis.js';
+} from '../../../../src/core/analysis.js';

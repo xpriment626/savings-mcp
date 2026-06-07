@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { createSavingsMastraTools } from '../src/mastra/tools/index.js';
-import type { SavingsCatalogue } from '../src/types.js';
+import type { SavingsCatalogue } from '../../src/types.js';
+import { createSavingsMastraTools } from './src/tools/index.js';
 
 const fixtureConfig = {
   useFixtureCatalogue: true,
