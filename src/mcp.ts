@@ -429,6 +429,10 @@ export async function handleMcpRequest(config: AppConfig, request: JsonRpcReques
       };
     }
 
+    if (method === 'notifications/initialized') {
+      return { jsonrpc: '2.0', id, result: {} };
+    }
+
     if (method === 'tools/list') {
       return { jsonrpc: '2.0', id, result: { tools: TOOLS } };
     }

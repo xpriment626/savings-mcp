@@ -22,6 +22,11 @@ function sendJson(res: ServerResponse, statusCode: number, payload: unknown): vo
   res.end(body);
 }
 
+function sendNoContent(res: ServerResponse, statusCode: number): void {
+  res.writeHead(statusCode);
+  res.end();
+}
+
 export function createSavingsMcpServer(overrides: Partial<AppConfig> = {}): SavingsMcpServer {
   const config: AppConfig = { ...loadConfig(), ...overrides };
   let server: NodeServer;
@@ -41,6 +46,10 @@ export function createSavingsMcpServer(overrides: Partial<AppConfig> = {}): Savi
     if (req.method === 'POST' && url.pathname === '/mcp') {
       try {
         const body = await readJson(req);
+        if (body.method === 'notifications/initialized' && body.id == null) {
+          sendNoContent(res, 202);
+          return;
+        }
         const response: JsonRpcResponse = await handleMcpRequest(config, body);
         sendJson(res, response.error ? 400 : 200, response);
       } catch (error) {
@@ -53,6 +62,11 @@ export function createSavingsMcpServer(overrides: Partial<AppConfig> = {}): Savi
           }
         });
       }
+      return;
+    }
+
+    if (req.method === 'DELETE' && url.pathname === '/mcp') {
+      sendNoContent(res, 202);
       return;
     }
 

@@ -108,6 +108,27 @@ describe('Savings MCP raw HTTP endpoint', () => {
     }
   });
 
+  it('accepts the initialized notification used by MCP clients', async () => {
+    const res = await fetch(`${requireBaseUrl()}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })
+    });
+
+    assert.equal(res.status, 202);
+    assert.equal(await res.text(), '');
+  });
+
+  it('accepts streamable HTTP session termination requests', async () => {
+    const res = await fetch(`${requireBaseUrl()}/mcp`, {
+      method: 'DELETE',
+      headers: { 'mcp-session-id': 'test-session' }
+    });
+
+    assert.equal(res.status, 202);
+    assert.equal(await res.text(), '');
+  });
+
   it('returns structured normalized canonical USDC opportunities', async () => {
     const body = await rpc('tools/call', {
       name: 'get_usdc_opportunities',
